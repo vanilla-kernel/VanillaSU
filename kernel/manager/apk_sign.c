@@ -436,22 +436,8 @@ int get_pkg_from_apk_path(char *pkg, const char *path)
 }
 
 static const struct ksu_manager_apk_identity ksu_manager_apk_identities[] = {
-#ifdef KSU_MANAGER_PACKAGE
-	{
-		.package = KSU_MANAGER_PACKAGE,
-		.cert_size = EXPECTED_MANAGER_SIZE,
-		.cert_sha256 = EXPECTED_MANAGER_HASH,
-	},
-#else
-	/* Package name is mandatory; add explicit entries below. */
-	{
-		.package = "",
-		.cert_size = 0,
-		.cert_sha256 = "",
-	},
-#endif
 	/*
-	 * Add more hardcoded managers here:
+	 * Valid manager APKs. Add one entry per accepted manager:
 	 * {
 	 *     .package = "com.example.manager",
 	 *     .cert_size = 0x3e6,
