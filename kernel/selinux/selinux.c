@@ -245,6 +245,24 @@ bool is_init(const struct cred *cred)
     return is_sid_match(cred, cached_init_sid, INIT_CONTEXT);
 }
 
+void escape_to_root_for_adb_root(void)
+{
+    struct cred *cred = prepare_creds();
+
+    if (!cred) {
+        pr_err("Failed to prepare adbd's creds!\n");
+        return;
+    }
+
+    if (transive_to_domain(KERNEL_SU_CONTEXT, cred)) {
+        pr_err("transive domain failed.\n");
+        abort_creds(cred);
+        return;
+    }
+
+    commit_creds(cred);
+}
+
 #ifdef CONFIG_KSU_SUSFS
 #define KERNEL_INIT_DOMAIN "u:r:init:s0"
 #define KERNEL_ZYGOTE_DOMAIN "u:r:zygote:s0"

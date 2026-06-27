@@ -9,6 +9,7 @@
 #include "policy/allowlist.h"
 #include "policy/app_profile.h"
 #include "policy/feature.h"
+#include "feature/adb_root.h"
 #include "feature/sulog.h"
 #include "klog.h" // IWYU pragma: keep
 #include "manager/manager_observer.h"
@@ -102,6 +103,7 @@ int __init kernelsu_init(void)
 
 	ksu_feature_init();
 	ksu_sulog_init();
+	ksu_adb_root_init();
 
 	ksu_supercalls_init();
 
@@ -181,6 +183,8 @@ void __exit kernelsu_exit(void)
 	ksu_throne_tracker_exit();
 
 	ksu_allowlist_exit();
+
+	ksu_adb_root_exit();
 
 	ksu_sulog_exit();
 

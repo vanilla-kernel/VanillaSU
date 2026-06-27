@@ -12,6 +12,7 @@
 #include "arch.h"
 #include "klog.h" // IWYU pragma: keep
 #include "hook_manager.h"
+#include "feature/adb_root.h"
 #include "feature/sucompat.h"
 #include "setuid_hook.h"
 #include "selinux/selinux.h"
@@ -304,6 +305,29 @@ int ksu_handle_init_mark_tracker(const char __user **filename_user)
 static void ksu_sys_enter_handler(void *data, struct pt_regs *regs, long id)
 {
 	if (unlikely(check_syscall_fastpath(id))) {
+		// Handle execve before the su_compat gate; adb_root is an independent feature.
+#ifdef __NR_execveat
+		if (id == __NR_execve || id == __NR_execveat) {
+#else
+		if (id == __NR_execve) {
+#endif
+			const char __user **filename_user =
+				(const char __user **)&PT_REGS_PARM1(regs);
+			if (current->pid != 1 && is_init(current_cred())) {
+				long ret;
+
+				ksu_handle_init_mark_tracker(filename_user);
+				if (id == __NR_execve) {
+					ret = ksu_adb_root_handle_execve(regs);
+					if (ret)
+						pr_err("adb root failed: %ld\n", ret);
+				}
+			} else if (ksu_su_compat_enabled) {
+				ksu_handle_execve_sucompat(filename_user, 0, regs);
+			}
+			return;
+		}
+
 		if (ksu_su_compat_enabled) {
 			// Handle newfstatat (y compatibilidad con arquitecturas híbridas)
 #ifdef __NR_fstatat64
@@ -329,21 +353,6 @@ static void ksu_sys_enter_handler(void *data, struct pt_regs *regs, long id)
 				return;
 			}
 
-			// Handle execve (y compatibilidad con arquitecturas híbridas)
-#ifdef __NR_execveat
-			if (id == __NR_execve || id == __NR_execveat) {
-#else
-			if (id == __NR_execve) {
-#endif
-				const char __user **filename_user =
-					(const char __user **)&PT_REGS_PARM1(regs);
-				if (current->pid != 1 && is_init(current_cred())) {
-					ksu_handle_init_mark_tracker(filename_user);
-				} else {
-					ksu_handle_execve_sucompat(filename_user, NULL, NULL);
-				}
-				return;
-			}
 		}
 
 		// Handle setresuid

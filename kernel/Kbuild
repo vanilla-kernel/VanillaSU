@@ -1,6 +1,7 @@
 kernelsu-objs := core/init.o
 
 kernelsu-objs += compat/kernel_compat.o
+kernelsu-objs += feature/adb_root.o
 kernelsu-objs += feature/kernel_umount.o
 kernelsu-objs += feature/sucompat.o
 kernelsu-objs += feature/sulog.o
