@@ -7,9 +7,8 @@ struct ksu_manager_apk_identity {
 	const char *package;
 	unsigned int cert_size;
 	const char *cert_sha256;
-	u32 spoof_version;
-	bool spoof_uapi_valid;
-	u32 spoof_uapi;
+	const u32 *spoof_version;
+	const u32 *spoof_uapi;
 	const char *spoof_tag;
 };
 

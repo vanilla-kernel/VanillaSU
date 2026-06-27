@@ -52,9 +52,10 @@ static void add_found_manager_appid(uid_t *appids,
 	}
 
 	appids[*count] = appid;
-	spoofs[*count].version = identity->spoof_version;
-	spoofs[*count].uapi_valid = identity->spoof_uapi_valid;
-	spoofs[*count].uapi = identity->spoof_uapi;
+	spoofs[*count].version_valid = identity->spoof_version != NULL;
+	spoofs[*count].version = identity->spoof_version ? *identity->spoof_version : 0;
+	spoofs[*count].uapi_valid = identity->spoof_uapi != NULL;
+	spoofs[*count].uapi = identity->spoof_uapi ? *identity->spoof_uapi : 0;
 	strscpy(spoofs[*count].tag, identity->spoof_tag ? identity->spoof_tag : "",
 		KSU_MANAGER_SPOOF_TAG_LEN);
 	(*count)++;
