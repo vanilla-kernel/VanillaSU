@@ -57,17 +57,12 @@ static void crown_manager(const char *apk,
 			  struct list_head *uid_data, uid_t *manager_appids,
 			  unsigned int *manager_appid_count)
 {
-	char pkg[KSU_MAX_PACKAGE_NAME];
 	const char *manager_pkg;
 
 	manager_pkg = identity->package;
 	if (!manager_pkg) {
-		if (get_pkg_from_apk_path(pkg, apk) < 0) {
-			pr_err("Failed to get package name from apk path: %s\n",
-				apk);
-			return;
-		}
-		manager_pkg = pkg;
+		pr_err("Manager identity without package for apk: %s\n", apk);
+		return;
 	}
 
 	pr_info("manager pkg: %s\n", manager_pkg);

@@ -443,10 +443,11 @@ static const struct ksu_manager_apk_identity ksu_manager_apk_identities[] = {
 		.cert_sha256 = EXPECTED_MANAGER_HASH,
 	},
 #else
+	/* Package name is mandatory; add explicit entries below. */
 	{
-		.package = NULL,
-		.cert_size = EXPECTED_MANAGER_SIZE,
-		.cert_sha256 = EXPECTED_MANAGER_HASH,
+		.package = "",
+		.cert_size = 0,
+		.cert_sha256 = "",
 	},
 #endif
 	/*
@@ -474,7 +475,7 @@ bool get_manager_apk_identity(char *path,
 		const struct ksu_manager_apk_identity *candidate =
 			&ksu_manager_apk_identities[i];
 
-		if (candidate->package &&
+		if (!candidate->package ||
 		    strncmp(pkg, candidate->package, KSU_MAX_PACKAGE_NAME))
 			continue;
 
