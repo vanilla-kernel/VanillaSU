@@ -435,19 +435,63 @@ int get_pkg_from_apk_path(char *pkg, const char *path)
 	return 0;
 }
 
-bool is_manager_apk(char *path)
-{
+static const struct ksu_manager_apk_identity ksu_manager_apk_identities[] = {
 #ifdef KSU_MANAGER_PACKAGE
+	{
+		.package = KSU_MANAGER_PACKAGE,
+		.cert_size = EXPECTED_MANAGER_SIZE,
+		.cert_sha256 = EXPECTED_MANAGER_HASH,
+	},
+#else
+	{
+		.package = NULL,
+		.cert_size = EXPECTED_MANAGER_SIZE,
+		.cert_sha256 = EXPECTED_MANAGER_HASH,
+	},
+#endif
+	/*
+	 * Add more hardcoded managers here:
+	 * {
+	 *     .package = "com.example.manager",
+	 *     .cert_size = 0x3e6,
+	 *     .cert_sha256 = "79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7",
+	 * },
+	 */
+};
+
+bool get_manager_apk_identity(char *path,
+			      struct ksu_manager_apk_identity *identity)
+{
+	unsigned int i;
 	char pkg[KSU_MAX_PACKAGE_NAME];
+
 	if (get_pkg_from_apk_path(pkg, path) < 0) {
 		pr_err("Failed to get package name from apk path: %s\n", path);
 		return false;
 	}
 
-	// pkg is `<real package>`
-	if (strncmp(pkg, KSU_MANAGER_PACKAGE, sizeof(KSU_MANAGER_PACKAGE))) {
-		return false;
+	for (i = 0; i < ARRAY_SIZE(ksu_manager_apk_identities); i++) {
+		const struct ksu_manager_apk_identity *candidate =
+			&ksu_manager_apk_identities[i];
+
+		if (candidate->package &&
+		    strncmp(pkg, candidate->package, KSU_MAX_PACKAGE_NAME))
+			continue;
+
+		if (!check_v2_signature(path, candidate->cert_size,
+					candidate->cert_sha256))
+			continue;
+
+		if (identity)
+			*identity = *candidate;
+
+		return true;
 	}
-#endif
-	return check_v2_signature(path, EXPECTED_MANAGER_SIZE, EXPECTED_MANAGER_HASH);
+
+	return false;
+}
+
+bool is_manager_apk(char *path)
+{
+	return get_manager_apk_identity(path, NULL);
 }
