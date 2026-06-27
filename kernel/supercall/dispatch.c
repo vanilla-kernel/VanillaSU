@@ -43,11 +43,12 @@ static int do_get_info(void __user *arg)
 {
 	struct ksu_get_info_cmd cmd = {.version = KERNEL_SU_VERSION, .flags = 0};
 	uid_t uid = current_uid().val;
-	u32 spoof_version;
+	u32 spoof_ksu_driver_version;
 	u32 spoof_uapi;
 
-	if (ksu_get_manager_spoof_version(uid, &spoof_version)) {
-		cmd.version = spoof_version;
+	if (ksu_get_manager_spoof_ksu_driver_version(
+		    uid, &spoof_ksu_driver_version)) {
+		cmd.version = spoof_ksu_driver_version;
 	} else if (ksuver_override) {
 		cmd.version = ksuver_override;
 	}
@@ -544,15 +545,16 @@ static int do_get_hook_mode(void __user *arg)
 static int do_get_version_tag(void __user *arg)
 {
 	struct ksu_get_version_tag_cmd cmd = {0};
-	const char *tag = ksu_get_manager_spoof_tag(current_uid().val);
+	const char *ksu_version =
+		ksu_get_manager_spoof_ksu_version(current_uid().val);
 
-	if (!tag)
-		tag = KERNEL_SU_VERSION_TAG;
+	if (!ksu_version)
+		ksu_version = KERNEL_SU_VERSION_TAG;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
-	strscpy(cmd.tag, tag, sizeof(cmd.tag));
+	strscpy(cmd.tag, ksu_version, sizeof(cmd.tag));
 #else
-	strlcpy(cmd.tag, tag, sizeof(cmd.tag));
+	strlcpy(cmd.tag, ksu_version, sizeof(cmd.tag));
 #endif
 
 	if (copy_to_user(arg, &cmd, sizeof(cmd))) {
