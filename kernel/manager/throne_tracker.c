@@ -30,7 +30,31 @@ struct uid_data {
 	char package[KSU_MAX_PACKAGE_NAME];
 };
 
-static void crown_manager(const char *apk, struct list_head *uid_data)
+static void add_found_manager_appid(uid_t *appids, unsigned int *count,
+				    uid_t appid)
+{
+	unsigned int i;
+
+	if (appid == (uid_t)KSU_INVALID_APPID)
+		return;
+
+	for (i = 0; i < *count; i++) {
+		if (appids[i] == appid)
+			return;
+	}
+
+	if (*count >= KSU_MAX_MANAGER_APPIDS) {
+		pr_warn("manager appid set full, dropping uid=%u\n", appid);
+		return;
+	}
+
+	appids[*count] = appid;
+	(*count)++;
+}
+
+static void crown_manager(const char *apk, struct list_head *uid_data,
+			  uid_t *manager_appids,
+			  unsigned int *manager_appid_count)
 {
 	char pkg[KSU_MAX_PACKAGE_NAME];
 	if (get_pkg_from_apk_path(pkg, apk) < 0) {
@@ -46,7 +70,8 @@ static void crown_manager(const char *apk, struct list_head *uid_data)
 	list_for_each_entry (np, list, list) {
 		if (strncmp(np->package, pkg, KSU_MAX_PACKAGE_NAME) == 0) {
 			pr_info("Crowning manager: %s(uid=%d)\n", pkg, np->uid);
-			ksu_set_manager_appid(np->uid);
+			add_found_manager_appid(manager_appids,
+						manager_appid_count, np->uid);
 			break;
 		}
 	}
@@ -72,7 +97,6 @@ struct my_dir_context {
 	char *parent_dir;
 	void *private_data;
 	int depth;
-	int *stop;
 };
 // https://docs.kernel.org/filesystems/porting.html
 // filldir_t (readdir callbacks) calling conventions have changed. Instead of returning 0 or -E... it returns bool now. false means "no more" (as -E... used to) and true - "keep going" (as 0 in old calling conventions). Rationale: callers never looked at specific -E... values anyway. -> iterate_shared() instances require no changes at all, all filldir_t ones in the tree converted.
@@ -90,22 +114,17 @@ FILLDIR_RETURN_TYPE my_actor(struct dir_context *ctx, const char *name,
 							int namelen, loff_t off, u64 ino,
 							unsigned int d_type)
 {
-	struct my_dir_context *my_ctx =
-		container_of(ctx, struct my_dir_context, ctx);
-
-	// we put the apk path we collected here
-	char *candidate_path = (char *)my_ctx->private_data;
-
 	char dirpath[DATA_PATH_LEN];
+	struct my_dir_context *my_ctx;
+	char *candidate_path;
 
-	if (!my_ctx) {
+	if (!ctx) {
 		pr_err("Invalid context\n");
 		return FILLDIR_ACTOR_STOP;
 	}
-	if (my_ctx->stop && *my_ctx->stop) {
-		pr_info("Stop searching\n");
-		return FILLDIR_ACTOR_STOP;
-	}
+
+	my_ctx = container_of(ctx, struct my_dir_context, ctx);
+	candidate_path = (char *)my_ctx->private_data;
 
 	if (!strncmp(name, "..", namelen) || !strncmp(name, ".", namelen))
 		return FILLDIR_ACTOR_CONTINUE; // Skip "." and ".."
@@ -122,8 +141,7 @@ FILLDIR_RETURN_TYPE my_actor(struct dir_context *ctx, const char *name,
 		return FILLDIR_ACTOR_CONTINUE;
 	}
 
-	if ((d_type == DT_DIR || d_type == DT_UNKNOWN) && my_ctx->depth > 0 &&
-		(my_ctx->stop && !*my_ctx->stop)) {
+	if ((d_type == DT_DIR || d_type == DT_UNKNOWN) && my_ctx->depth > 0) {
 		struct data_path *data = kzalloc(sizeof(struct data_path), GFP_KERNEL);
 
 		if (!data) {
@@ -146,9 +164,11 @@ FILLDIR_RETURN_TYPE my_actor(struct dir_context *ctx, const char *name,
 	return FILLDIR_ACTOR_CONTINUE;
 }
 
-void search_manager(const char *path, int depth, struct list_head *uid_data)
+void search_manager(const char *path, int depth, struct list_head *uid_data,
+		    uid_t *manager_appids,
+		    unsigned int *manager_appid_count)
 {
-	int i, stop = 0;
+	int i;
 	struct list_head data_path_list;
 	INIT_LIST_HEAD(&data_path_list);
 
@@ -169,41 +189,37 @@ void search_manager(const char *path, int depth, struct list_head *uid_data)
 										.data_path_list = &data_path_list,
 										.parent_dir = pos->dirpath,
 										.private_data = candidate_path,
-										.depth = pos->depth,
-										.stop = &stop };
+										.depth = pos->depth };
 
 			// make sure to clean buffer on every iteration
 			memset(candidate_path, 0, DATA_PATH_LEN);
 
 			struct file *file;
 
-			if (!stop) {
-				file = ksu_filp_open_compat(pos->dirpath, O_RDONLY | O_NOFOLLOW, 0);
-				if (IS_ERR(file)) {
-					pr_err("Failed to open directory: %s, err: %ld\n",
-						pos->dirpath, PTR_ERR(file));
-					goto skip_iterate;
-				}
-
-				iterate_dir(file, &ctx.ctx);
-				filp_close(file, NULL);
-
-				// ^ oh so thats the issue!
-				// we were calling is_manager_apk inside iterate_dir
-				// now we defer file opens after iterate_dir
-				// this way we dont open apks while inside that
-				if (!strstarts(candidate_path, "/data/ap") )
-					goto skip_iterate;
-
-				bool is_manager = is_manager_apk(candidate_path);
-				pr_info("Found new base.apk at path: %s, is_manager: %d\n", candidate_path, is_manager);
-
-				if (likely(!is_manager))
-					goto skip_iterate;
-
-				crown_manager(candidate_path, uid_data);
-				stop = 1;
+			file = ksu_filp_open_compat(pos->dirpath, O_RDONLY | O_NOFOLLOW, 0);
+			if (IS_ERR(file)) {
+				pr_err("Failed to open directory: %s, err: %ld\n",
+					pos->dirpath, PTR_ERR(file));
+				goto skip_iterate;
 			}
+
+			iterate_dir(file, &ctx.ctx);
+			filp_close(file, NULL);
+
+			// ^ oh so thats the issue!
+			// we were calling is_manager_apk inside iterate_dir
+			// now we defer file opens after iterate_dir
+			// this way we dont open apks while inside that
+			if (!strstarts(candidate_path, "/data/ap"))
+				goto skip_iterate;
+
+			if (likely(!is_manager_apk(candidate_path)))
+				goto skip_iterate;
+
+			pr_info("Found manager base.apk at path: %s\n",
+				candidate_path);
+			crown_manager(candidate_path, uid_data, manager_appids,
+				      manager_appid_count);
 		skip_iterate:
 			list_del(&pos->list);
 			if (pos != &data)
@@ -323,29 +339,19 @@ static bool do_track_throne_core(bool prune_only)
 	// now update uid list
 	struct uid_data *np;
 	struct uid_data *n;
+	uid_t found_manager_appids[KSU_MAX_MANAGER_APPIDS] = { 0 };
+	unsigned int found_manager_appid_count = 0;
 
 	if (prune_only)
 		goto prune;
 
-	// first, check if manager_uid exist!
-	bool manager_exist = false;
-	list_for_each_entry (np, &uid_list, list) {
-		if (np->uid == ksu_get_manager_appid()) {
-			manager_exist = true;
-			break;
-		}
-	}
-
-	if (!manager_exist) {
-		if (ksu_is_manager_appid_valid()) {
-			pr_info("manager is uninstalled, invalidate it!\n");
-			ksu_invalidate_manager_uid();
-			goto prune;
-		}
-		pr_info("Searching manager...\n");
-		search_manager("/data/app", 2, &uid_list);
-		pr_info("Search manager finished\n");
-	}
+	pr_info("Searching manager...\n");
+	search_manager("/data/app", 2, &uid_list, found_manager_appids,
+		       &found_manager_appid_count);
+	ksu_replace_manager_appids(found_manager_appids,
+				   found_manager_appid_count);
+	pr_info("Search manager finished, found %u managers\n",
+		found_manager_appid_count);
 
 prune:
 	// then prune the allowlist

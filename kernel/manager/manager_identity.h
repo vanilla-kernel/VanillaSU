@@ -44,6 +44,13 @@ static inline void ksu_clear_manager_appids()
 {
 }
 
+static inline void ksu_replace_manager_appids(const uid_t *appids,
+                                              unsigned int count)
+{
+    (void)appids;
+    (void)count;
+}
+
 static inline void ksu_invalidate_manager_uid()
 {
 }
@@ -88,18 +95,45 @@ static inline uid_t ksu_get_manager_appid()
 
 static inline void ksu_clear_manager_appids()
 {
+	unsigned int i;
+
+	for (i = 0; i < ksu_manager_appid_count; i++)
+		ksu_manager_appids[i] = KSU_INVALID_APPID;
+
 	ksu_manager_appid_count = 0;
+}
+
+static inline void ksu_replace_manager_appids(const uid_t *appids,
+                                              unsigned int count)
+{
+	unsigned int i;
+	unsigned int old_count = ksu_manager_appid_count;
+
+	if (!count) {
+		ksu_clear_manager_appids();
+		return;
+	}
+
+	if (count > KSU_MAX_MANAGER_APPIDS)
+		count = KSU_MAX_MANAGER_APPIDS;
+
+	for (i = 0; i < count; i++)
+		ksu_manager_appids[i] = appids[i];
+
+	for (; i < old_count; i++)
+		ksu_manager_appids[i] = KSU_INVALID_APPID;
+
+	ksu_manager_appid_count = count;
 }
 
 static inline void ksu_set_manager_appid(uid_t appid)
 {
-	ksu_clear_manager_appids();
-
-	if (appid == (uid_t)KSU_INVALID_APPID)
+	if (appid == (uid_t)KSU_INVALID_APPID) {
+		ksu_clear_manager_appids();
 		return;
+	}
 
-	ksu_manager_appids[0] = appid;
-	ksu_manager_appid_count = 1;
+	ksu_replace_manager_appids(&appid, 1);
 }
 
 static inline bool ksu_add_manager_appid(uid_t appid)
