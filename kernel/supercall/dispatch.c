@@ -39,33 +39,64 @@ static int do_grant_root(void __user *arg)
 	return 0;
 }
 
-static int do_get_info(void __user *arg)
+static void fill_get_info_common(u32 *version, u32 *flags, u32 *features)
 {
-	struct ksu_get_info_cmd cmd = {.version = KERNEL_SU_VERSION, .flags = 0};
 	uid_t uid = current_uid().val;
 	u32 spoof_ksu_driver_version;
-	u32 spoof_uapi;
+	u32 spoof_features;
 
 	if (ksu_get_manager_spoof_ksu_driver_version(
 		    uid, &spoof_ksu_driver_version)) {
-		cmd.version = spoof_ksu_driver_version;
+		*version = spoof_ksu_driver_version;
 	} else if (ksuver_override) {
-		cmd.version = ksuver_override;
+		*version = ksuver_override;
 	}
-	
+
 #ifdef MODULE
-	cmd.flags |= KSU_GET_INFO_FLAG_LKM;
+	*flags |= KSU_GET_INFO_FLAG_LKM;
 #endif
 
 	if (is_manager()) {
-		cmd.flags |= KSU_GET_INFO_FLAG_MANAGER;
+		*flags |= KSU_GET_INFO_FLAG_MANAGER;
 	}
 	if (ksu_late_loaded) {
-		cmd.flags |= KSU_GET_INFO_FLAG_LATE_LOAD;
+		*flags |= KSU_GET_INFO_FLAG_LATE_LOAD;
 	}
-	cmd.features = KSU_FEATURE_MAX;
-	if (ksu_get_manager_spoof_uapi(uid, &spoof_uapi))
-		cmd.features = spoof_uapi;
+	*features = KSU_FEATURE_MAX;
+	if (ksu_get_manager_spoof_features(uid, &spoof_features))
+		*features = spoof_features;
+}
+
+static int do_get_info(void __user *arg)
+{
+	struct ksu_get_info_cmd cmd = {
+		.version = KERNEL_SU_VERSION,
+		.flags = 0,
+		.uapi_version = KERNEL_SU_UAPI_VERSION,
+	};
+	u32 spoof_uapi_version;
+
+	fill_get_info_common(&cmd.version, &cmd.flags, &cmd.features);
+	if (ksu_get_manager_spoof_uapi_version(current_uid().val,
+					       &spoof_uapi_version))
+		cmd.uapi_version = spoof_uapi_version;
+
+	if (copy_to_user(arg, &cmd, sizeof(cmd))) {
+		pr_err("get_version: copy_to_user failed\n");
+		return -EFAULT;
+	}
+
+	return 0;
+}
+
+static int do_get_info_legacy(void __user *arg)
+{
+	struct ksu_get_info_legacy_cmd cmd = {
+		.version = KERNEL_SU_VERSION,
+		.flags = 0,
+	};
+
+	fill_get_info_common(&cmd.version, &cmd.flags, &cmd.features);
 
 	if (copy_to_user(arg, &cmd, sizeof(cmd))) {
 		pr_err("get_version: copy_to_user failed\n");
@@ -797,6 +828,12 @@ static const struct ksu_ioctl_cmd_map ksu_ioctl_handlers[] = {
         .cmd = KSU_IOCTL_GET_INFO,
         .name = "GET_INFO",
         .handler = do_get_info,
+        .perm_check = always_allow
+    },
+    {
+        .cmd = KSU_IOCTL_GET_INFO_LEGACY,
+        .name = "GET_INFO_LEGACY",
+        .handler = do_get_info_legacy,
         .perm_check = always_allow
     },
 	{

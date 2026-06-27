@@ -12,8 +12,10 @@
 struct ksu_manager_spoof {
 	bool ksu_driver_version_valid;
 	u32 ksu_driver_version;
-	bool uapi_valid;
-	u32 uapi;
+	bool features_valid;
+	u32 features;
+	bool uapi_version_valid;
+	u32 uapi_version;
 	char ksu_version[KSU_MANAGER_SPOOF_TAG_LEN];
 };
 
@@ -52,10 +54,18 @@ static inline const char *ksu_get_manager_spoof_ksu_version(uid_t uid)
     return NULL;
 }
 
-static inline bool ksu_get_manager_spoof_uapi(uid_t uid, u32 *uapi)
+static inline bool ksu_get_manager_spoof_features(uid_t uid, u32 *features)
 {
     (void)uid;
-    (void)uapi;
+    (void)features;
+    return false;
+}
+
+static inline bool ksu_get_manager_spoof_uapi_version(uid_t uid,
+						      u32 *uapi_version)
+{
+    (void)uid;
+    (void)uapi_version;
     return false;
 }
 
@@ -168,14 +178,26 @@ static inline const char *ksu_get_manager_spoof_ksu_version(uid_t uid)
 	return spoof->ksu_version;
 }
 
-static inline bool ksu_get_manager_spoof_uapi(uid_t uid, u32 *uapi)
+static inline bool ksu_get_manager_spoof_features(uid_t uid, u32 *features)
 {
 	const struct ksu_manager_spoof *spoof = ksu_get_manager_spoof(uid);
 
-	if (!spoof || !spoof->uapi_valid || !uapi)
+	if (!spoof || !spoof->features_valid || !features)
 		return false;
 
-	*uapi = spoof->uapi;
+	*features = spoof->features;
+	return true;
+}
+
+static inline bool ksu_get_manager_spoof_uapi_version(uid_t uid,
+						      u32 *uapi_version)
+{
+	const struct ksu_manager_spoof *spoof = ksu_get_manager_spoof(uid);
+
+	if (!spoof || !spoof->uapi_version_valid || !uapi_version)
+		return false;
+
+	*uapi_version = spoof->uapi_version;
 	return true;
 }
 
@@ -187,8 +209,10 @@ static inline void ksu_clear_manager_appids()
 		ksu_manager_appids[i] = KSU_INVALID_APPID;
 		ksu_manager_spoofs[i].ksu_driver_version_valid = false;
 		ksu_manager_spoofs[i].ksu_driver_version = 0;
-		ksu_manager_spoofs[i].uapi_valid = false;
-		ksu_manager_spoofs[i].uapi = 0;
+		ksu_manager_spoofs[i].features_valid = false;
+		ksu_manager_spoofs[i].features = 0;
+		ksu_manager_spoofs[i].uapi_version_valid = false;
+		ksu_manager_spoofs[i].uapi_version = 0;
 		ksu_manager_spoofs[i].ksu_version[0] = '\0';
 	}
 
@@ -213,8 +237,10 @@ static inline void ksu_replace_manager_appids(const uid_t *appids,
 		ksu_manager_appids[i] = appids[i];
 		ksu_manager_spoofs[i].ksu_driver_version_valid = false;
 		ksu_manager_spoofs[i].ksu_driver_version = 0;
-		ksu_manager_spoofs[i].uapi_valid = false;
-		ksu_manager_spoofs[i].uapi = 0;
+		ksu_manager_spoofs[i].features_valid = false;
+		ksu_manager_spoofs[i].features = 0;
+		ksu_manager_spoofs[i].uapi_version_valid = false;
+		ksu_manager_spoofs[i].uapi_version = 0;
 		ksu_manager_spoofs[i].ksu_version[0] = '\0';
 	}
 
@@ -222,8 +248,10 @@ static inline void ksu_replace_manager_appids(const uid_t *appids,
 		ksu_manager_appids[i] = KSU_INVALID_APPID;
 		ksu_manager_spoofs[i].ksu_driver_version_valid = false;
 		ksu_manager_spoofs[i].ksu_driver_version = 0;
-		ksu_manager_spoofs[i].uapi_valid = false;
-		ksu_manager_spoofs[i].uapi = 0;
+		ksu_manager_spoofs[i].features_valid = false;
+		ksu_manager_spoofs[i].features = 0;
+		ksu_manager_spoofs[i].uapi_version_valid = false;
+		ksu_manager_spoofs[i].uapi_version = 0;
 		ksu_manager_spoofs[i].ksu_version[0] = '\0';
 	}
 
@@ -254,8 +282,10 @@ static inline void ksu_replace_manager_appids_with_spoof(
 		ksu_manager_appids[i] = KSU_INVALID_APPID;
 		ksu_manager_spoofs[i].ksu_driver_version_valid = false;
 		ksu_manager_spoofs[i].ksu_driver_version = 0;
-		ksu_manager_spoofs[i].uapi_valid = false;
-		ksu_manager_spoofs[i].uapi = 0;
+		ksu_manager_spoofs[i].features_valid = false;
+		ksu_manager_spoofs[i].features = 0;
+		ksu_manager_spoofs[i].uapi_version_valid = false;
+		ksu_manager_spoofs[i].uapi_version = 0;
 		ksu_manager_spoofs[i].ksu_version[0] = '\0';
 	}
 
@@ -286,8 +316,10 @@ static inline bool ksu_add_manager_appid(uid_t appid)
 	ksu_manager_appids[ksu_manager_appid_count] = appid;
 	ksu_manager_spoofs[ksu_manager_appid_count].ksu_driver_version_valid = false;
 	ksu_manager_spoofs[ksu_manager_appid_count].ksu_driver_version = 0;
-	ksu_manager_spoofs[ksu_manager_appid_count].uapi_valid = false;
-	ksu_manager_spoofs[ksu_manager_appid_count].uapi = 0;
+	ksu_manager_spoofs[ksu_manager_appid_count].features_valid = false;
+	ksu_manager_spoofs[ksu_manager_appid_count].features = 0;
+	ksu_manager_spoofs[ksu_manager_appid_count].uapi_version_valid = false;
+	ksu_manager_spoofs[ksu_manager_appid_count].uapi_version = 0;
 	ksu_manager_spoofs[ksu_manager_appid_count].ksu_version[0] = '\0';
 	ksu_manager_appid_count++;
 	return true;

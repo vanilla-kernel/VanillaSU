@@ -58,8 +58,13 @@ static void add_found_manager_appid(uid_t *appids,
 		identity->spoof_ksu_driver_version ?
 			*identity->spoof_ksu_driver_version :
 			0;
-	spoofs[*count].uapi_valid = identity->spoof_uapi != NULL;
-	spoofs[*count].uapi = identity->spoof_uapi ? *identity->spoof_uapi : 0;
+	spoofs[*count].features_valid = identity->spoof_features != NULL;
+	spoofs[*count].features =
+		identity->spoof_features ? *identity->spoof_features : 0;
+	spoofs[*count].uapi_version_valid =
+		identity->spoof_uapi_version != NULL;
+	spoofs[*count].uapi_version =
+		identity->spoof_uapi_version ? *identity->spoof_uapi_version : 0;
 	strscpy(spoofs[*count].ksu_version,
 		identity->spoof_ksu_version ? identity->spoof_ksu_version : "",
 		KSU_MANAGER_SPOOF_TAG_LEN);
