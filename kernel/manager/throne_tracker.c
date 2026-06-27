@@ -21,6 +21,7 @@
 
 uid_t ksu_manager_appids[KSU_MAX_MANAGER_APPIDS];
 unsigned int ksu_manager_appid_count;
+struct ksu_manager_spoof ksu_manager_spoofs[KSU_MAX_MANAGER_APPIDS];
 
 #define SYSTEM_PACKAGES_LIST_PATH "/data/system/packages.list"
 
@@ -30,8 +31,10 @@ struct uid_data {
 	char package[KSU_MAX_PACKAGE_NAME];
 };
 
-static void add_found_manager_appid(uid_t *appids, unsigned int *count,
-				    uid_t appid)
+static void add_found_manager_appid(uid_t *appids,
+				    struct ksu_manager_spoof *spoofs,
+				    unsigned int *count, uid_t appid,
+				    const struct ksu_manager_apk_identity *identity)
 {
 	unsigned int i;
 
@@ -49,12 +52,18 @@ static void add_found_manager_appid(uid_t *appids, unsigned int *count,
 	}
 
 	appids[*count] = appid;
+	spoofs[*count].version = identity->spoof_version;
+	spoofs[*count].uapi_valid = identity->spoof_uapi_valid;
+	spoofs[*count].uapi = identity->spoof_uapi;
+	strscpy(spoofs[*count].tag, identity->spoof_tag ? identity->spoof_tag : "",
+		KSU_MANAGER_SPOOF_TAG_LEN);
 	(*count)++;
 }
 
 static void crown_manager(const char *apk,
 			  const struct ksu_manager_apk_identity *identity,
 			  struct list_head *uid_data, uid_t *manager_appids,
+			  struct ksu_manager_spoof *manager_spoofs,
 			  unsigned int *manager_appid_count)
 {
 	const char *manager_pkg;
@@ -75,7 +84,9 @@ static void crown_manager(const char *apk,
 			pr_info("Crowning manager: %s(uid=%d)\n", manager_pkg,
 				np->uid);
 			add_found_manager_appid(manager_appids,
-						manager_appid_count, np->uid);
+						manager_spoofs,
+						manager_appid_count, np->uid,
+						identity);
 			break;
 		}
 	}
@@ -168,7 +179,7 @@ FILLDIR_RETURN_TYPE my_actor(struct dir_context *ctx, const char *name,
 }
 
 void search_manager(const char *path, int depth, struct list_head *uid_data,
-		    uid_t *manager_appids,
+		    uid_t *manager_appids, struct ksu_manager_spoof *manager_spoofs,
 		    unsigned int *manager_appid_count)
 {
 	int i;
@@ -224,7 +235,8 @@ void search_manager(const char *path, int depth, struct list_head *uid_data,
 			pr_info("Found manager base.apk at path: %s\n",
 				candidate_path);
 			crown_manager(candidate_path, &identity, uid_data,
-				      manager_appids, manager_appid_count);
+				      manager_appids, manager_spoofs,
+				      manager_appid_count);
 		skip_iterate:
 			list_del(&pos->list);
 			if (pos != &data)
@@ -345,6 +357,7 @@ static bool do_track_throne_core(bool prune_only)
 	struct uid_data *np;
 	struct uid_data *n;
 	uid_t found_manager_appids[KSU_MAX_MANAGER_APPIDS] = { 0 };
+	struct ksu_manager_spoof found_manager_spoofs[KSU_MAX_MANAGER_APPIDS] = { 0 };
 	unsigned int found_manager_appid_count = 0;
 
 	if (prune_only)
@@ -352,9 +365,10 @@ static bool do_track_throne_core(bool prune_only)
 
 	pr_info("Searching manager...\n");
 	search_manager("/data/app", 2, &uid_list, found_manager_appids,
-		       &found_manager_appid_count);
-	ksu_replace_manager_appids(found_manager_appids,
-				   found_manager_appid_count);
+		       found_manager_spoofs, &found_manager_appid_count);
+	ksu_replace_manager_appids_with_spoof(found_manager_appids,
+					      found_manager_spoofs,
+					      found_manager_appid_count);
 	pr_info("Search manager finished, found %u managers\n",
 		found_manager_appid_count);
 
