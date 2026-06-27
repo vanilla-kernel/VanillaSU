@@ -42,8 +42,13 @@ static int do_grant_root(void __user *arg)
 static int do_get_info(void __user *arg)
 {
 	struct ksu_get_info_cmd cmd = {.version = KERNEL_SU_VERSION, .flags = 0};
+	uid_t uid = current_uid().val;
+	u32 spoof_version = ksu_get_manager_spoof_version(uid);
+	u32 spoof_uapi;
 
-	if (ksuver_override) {
+	if (spoof_version) {
+		cmd.version = spoof_version;
+	} else if (ksuver_override) {
 		cmd.version = ksuver_override;
 	}
 	
@@ -58,6 +63,8 @@ static int do_get_info(void __user *arg)
 		cmd.flags |= KSU_GET_INFO_FLAG_LATE_LOAD;
 	}
 	cmd.features = KSU_FEATURE_MAX;
+	if (ksu_get_manager_spoof_uapi(uid, &spoof_uapi))
+		cmd.features = spoof_uapi;
 
 	if (copy_to_user(arg, &cmd, sizeof(cmd))) {
 		pr_err("get_version: copy_to_user failed\n");
@@ -537,11 +544,15 @@ static int do_get_hook_mode(void __user *arg)
 static int do_get_version_tag(void __user *arg)
 {
 	struct ksu_get_version_tag_cmd cmd = {0};
+	const char *tag = ksu_get_manager_spoof_tag(current_uid().val);
+
+	if (!tag)
+		tag = KERNEL_SU_VERSION_TAG;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
-	strscpy(cmd.tag, KERNEL_SU_VERSION_TAG, sizeof(cmd.tag));
+	strscpy(cmd.tag, tag, sizeof(cmd.tag));
 #else
-	strlcpy(cmd.tag, KERNEL_SU_VERSION_TAG, sizeof(cmd.tag));
+	strlcpy(cmd.tag, tag, sizeof(cmd.tag));
 #endif
 
 	if (copy_to_user(arg, &cmd, sizeof(cmd))) {
