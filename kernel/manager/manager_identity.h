@@ -10,6 +10,7 @@
 #define KSU_MANAGER_SPOOF_TAG_LEN 32
 
 struct ksu_manager_spoof {
+	bool version_valid;
 	u32 version;
 	bool uapi_valid;
 	u32 uapi;
@@ -37,10 +38,11 @@ static inline uid_t ksu_get_manager_appid()
     return 0;
 }
 
-static inline u32 ksu_get_manager_spoof_version(uid_t uid)
+static inline bool ksu_get_manager_spoof_version(uid_t uid, u32 *version)
 {
     (void)uid;
-    return 0;
+    (void)version;
+    return false;
 }
 
 static inline const char *ksu_get_manager_spoof_tag(uid_t uid)
@@ -143,14 +145,15 @@ static inline const struct ksu_manager_spoof *ksu_get_manager_spoof(uid_t uid)
 	return NULL;
 }
 
-static inline u32 ksu_get_manager_spoof_version(uid_t uid)
+static inline bool ksu_get_manager_spoof_version(uid_t uid, u32 *version)
 {
 	const struct ksu_manager_spoof *spoof = ksu_get_manager_spoof(uid);
 
-	if (!spoof)
-		return 0;
+	if (!spoof || !spoof->version_valid || !version)
+		return false;
 
-	return spoof->version;
+	*version = spoof->version;
+	return true;
 }
 
 static inline const char *ksu_get_manager_spoof_tag(uid_t uid)
@@ -180,6 +183,7 @@ static inline void ksu_clear_manager_appids()
 
 	for (i = 0; i < ksu_manager_appid_count; i++) {
 		ksu_manager_appids[i] = KSU_INVALID_APPID;
+		ksu_manager_spoofs[i].version_valid = false;
 		ksu_manager_spoofs[i].version = 0;
 		ksu_manager_spoofs[i].uapi_valid = false;
 		ksu_manager_spoofs[i].uapi = 0;
@@ -205,6 +209,7 @@ static inline void ksu_replace_manager_appids(const uid_t *appids,
 
 	for (i = 0; i < count; i++) {
 		ksu_manager_appids[i] = appids[i];
+		ksu_manager_spoofs[i].version_valid = false;
 		ksu_manager_spoofs[i].version = 0;
 		ksu_manager_spoofs[i].uapi_valid = false;
 		ksu_manager_spoofs[i].uapi = 0;
@@ -213,6 +218,7 @@ static inline void ksu_replace_manager_appids(const uid_t *appids,
 
 	for (; i < old_count; i++) {
 		ksu_manager_appids[i] = KSU_INVALID_APPID;
+		ksu_manager_spoofs[i].version_valid = false;
 		ksu_manager_spoofs[i].version = 0;
 		ksu_manager_spoofs[i].uapi_valid = false;
 		ksu_manager_spoofs[i].uapi = 0;
@@ -244,6 +250,7 @@ static inline void ksu_replace_manager_appids_with_spoof(
 
 	for (; i < old_count; i++) {
 		ksu_manager_appids[i] = KSU_INVALID_APPID;
+		ksu_manager_spoofs[i].version_valid = false;
 		ksu_manager_spoofs[i].version = 0;
 		ksu_manager_spoofs[i].uapi_valid = false;
 		ksu_manager_spoofs[i].uapi = 0;
@@ -275,6 +282,7 @@ static inline bool ksu_add_manager_appid(uid_t appid)
 		return false;
 
 	ksu_manager_appids[ksu_manager_appid_count] = appid;
+	ksu_manager_spoofs[ksu_manager_appid_count].version_valid = false;
 	ksu_manager_spoofs[ksu_manager_appid_count].version = 0;
 	ksu_manager_spoofs[ksu_manager_appid_count].uapi_valid = false;
 	ksu_manager_spoofs[ksu_manager_appid_count].uapi = 0;

@@ -43,10 +43,10 @@ static int do_get_info(void __user *arg)
 {
 	struct ksu_get_info_cmd cmd = {.version = KERNEL_SU_VERSION, .flags = 0};
 	uid_t uid = current_uid().val;
-	u32 spoof_version = ksu_get_manager_spoof_version(uid);
+	u32 spoof_version;
 	u32 spoof_uapi;
 
-	if (spoof_version) {
+	if (ksu_get_manager_spoof_version(uid, &spoof_version)) {
 		cmd.version = spoof_version;
 	} else if (ksuver_override) {
 		cmd.version = ksuver_override;
