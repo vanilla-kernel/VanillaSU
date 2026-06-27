@@ -19,7 +19,8 @@
 #include "throne_tracker.h"
 #include "compat/kernel_compat.h"
 
-uid_t ksu_manager_appid = KSU_INVALID_APPID;
+uid_t ksu_manager_appids[KSU_MAX_MANAGER_APPIDS];
+unsigned int ksu_manager_appid_count;
 
 #define SYSTEM_PACKAGES_LIST_PATH "/data/system/packages.list"
 
