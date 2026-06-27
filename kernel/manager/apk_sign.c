@@ -435,8 +435,7 @@ int get_pkg_from_apk_path(char *pkg, const char *path)
 	return 0;
 }
 
-static const u32 ksu_legacy_spoof_version = 32525;
-static const u32 ksu_legacy_spoof_uapi = 0;
+#define KSU_MANAGER_SPOOF_U32(value) (&(const u32){ value })
 
 static const struct ksu_manager_apk_identity ksu_manager_apk_identities[] = {
 	/*
@@ -445,8 +444,8 @@ static const struct ksu_manager_apk_identity ksu_manager_apk_identities[] = {
 	 *     .package = "com.example.manager",
 	 *     .cert_size = 0x3e6,
 	 *     .cert_sha256 = "79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7",
-	 *     .spoof_version = &ksu_legacy_spoof_version,
-	 *     .spoof_uapi = &ksu_legacy_spoof_uapi,
+	 *     .spoof_version = KSU_MANAGER_SPOOF_U32(32525),
+	 *     .spoof_uapi = KSU_MANAGER_SPOOF_U32(0),
 	 *     .spoof_tag = "v3.2.0-legacy",
 	 *     Set any spoof_* field to NULL to disable that spoof.
 	 * },
@@ -455,40 +454,40 @@ static const struct ksu_manager_apk_identity ksu_manager_apk_identities[] = {
 		.package = "me.weishu.kernelsu",
 		.cert_size = 0x33b,
 		.cert_sha256 = "c371061b19d8c7d7d6133c6a9bafe198fa944e50c1b31c9d8daa8d7f1fc2d2d6",
-		.spoof_version = &ksu_legacy_spoof_version,
-		.spoof_uapi = &ksu_legacy_spoof_uapi,
+		.spoof_version = KSU_MANAGER_SPOOF_U32(32525),
+		.spoof_uapi = KSU_MANAGER_SPOOF_U32(0),
 		.spoof_tag = "v3.2.0-legacy",
 	},
 	{
 		.package = "com.rifsxd.ksunext",
 		.cert_size = 0x3e6,
 		.cert_sha256 = "79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7",
-		.spoof_version = &ksu_legacy_spoof_version,
-		.spoof_uapi = &ksu_legacy_spoof_uapi,
+		.spoof_version = KSU_MANAGER_SPOOF_U32(32525),
+		.spoof_uapi = KSU_MANAGER_SPOOF_U32(0),
 		.spoof_tag = "v3.2.0-legacy",
 	},
 	{
 		.package = "com.sukisu.ultra",
 		.cert_size = 0x35c,
 		.cert_sha256 = "947ae944f3de4ed4c21a7e4f7953ecf351bfa2b36239da37a34111ad29993eef",
-		.spoof_version = &ksu_legacy_spoof_version,
-		.spoof_uapi = &ksu_legacy_spoof_uapi,
+		.spoof_version = KSU_MANAGER_SPOOF_U32(32525),
+		.spoof_uapi = KSU_MANAGER_SPOOF_U32(0),
 		.spoof_tag = "v3.2.0-legacy",
 	},
 	{
 		.package = "com.resukisu.resukisu",
 		.cert_size = 0x377,
 		.cert_sha256 = "d3469712b6214462764a1d8d3e5cbe1d6819a0b629791b9f4101867821f1df64",
-		.spoof_version = &ksu_legacy_spoof_version,
-		.spoof_uapi = &ksu_legacy_spoof_uapi,
+		.spoof_version = KSU_MANAGER_SPOOF_U32(32525),
+		.spoof_uapi = KSU_MANAGER_SPOOF_U32(0),
 		.spoof_tag = "v3.2.0-legacy",
 	},
 	{
 		.package = "wffxxf.nclgit.cawxcw",
 		.cert_size = 0x396,
 		.cert_sha256 = "f415f4ed9435427e1fdf7f1fccd4dbc07b3d6b8751e4dbcec6f19671f427870b",
-		.spoof_version = &ksu_legacy_spoof_version,
-		.spoof_uapi = &ksu_legacy_spoof_uapi,
+		.spoof_version = KSU_MANAGER_SPOOF_U32(32525),
+		.spoof_uapi = KSU_MANAGER_SPOOF_U32(0),
 		.spoof_tag = "v3.2.0-legacy",
 	},
 };
