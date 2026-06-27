@@ -445,14 +445,14 @@ static const struct ksu_manager_apk_identity ksu_manager_apk_identities[] = {
 	 * },
 	 */
 	{
-		.package = "com.rifsxd.ksunext",
-		.cert_size = 0x3e6,
-		.cert_sha256 = "79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7",
-	},
-	{
 		.package = "me.weishu.kernelsu",
 		.cert_size = 0x33b,
 		.cert_sha256 = "c371061b19d8c7d7d6133c6a9bafe198fa944e50c1b31c9d8daa8d7f1fc2d2d6",
+	},
+	{
+		.package = "com.rifsxd.ksunext",
+		.cert_size = 0x3e6,
+		.cert_sha256 = "79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7",
 	},
 	{
 		.package = "com.sukisu.ultra",
