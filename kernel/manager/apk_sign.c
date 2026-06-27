@@ -454,8 +454,8 @@ static const struct ksu_manager_apk_identity ksu_manager_apk_identities[] = {
 		.package = "me.weishu.kernelsu",
 		.cert_size = 0x33b,
 		.cert_sha256 = "c371061b19d8c7d7d6133c6a9bafe198fa944e50c1b31c9d8daa8d7f1fc2d2d6",
-		.spoof_version = KSU_MANAGER_SPOOF_U32(32525),
-		.spoof_uapi = KSU_MANAGER_SPOOF_U32(0),
+		.spoof_version = KSU_MANAGER_SPOOF_U32(32513),
+		.spoof_uapi = KSU_MANAGER_SPOOF_U32(2),
 		.spoof_tag = "v3.2.0-legacy",
 	},
 	{
