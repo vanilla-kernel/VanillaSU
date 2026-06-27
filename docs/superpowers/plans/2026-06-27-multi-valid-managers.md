@@ -4,7 +4,7 @@
 
 **Goal:** Allow several valid KernelSU manager app IDs inside the kernel while preserving the legacy primary manager app ID API.
 
-**Architecture:** Store manager app IDs in a fixed-size identity set with the first entry treated as the primary app ID. Update the throne tracker to rebuild the set from every valid manager APK it finds, while root-only manual override still resets the set to one app ID.
+**Architecture:** Store manager app IDs in a fixed-size identity set with the first entry treated as the primary app ID. Update the throne tracker to collect every valid manager APK into a local fixed-size buffer and replace the global set after the scan, while root-only manual override still resets the set to one app ID.
 
 **Tech Stack:** Linux kernel C, KernelSU manager identity helpers, existing supercall UAPI.
 
@@ -25,7 +25,7 @@
 - Modify: `kernel/manager/throne_tracker.c`
 
 **Interfaces:**
-- Produces: `ksu_manager_appids[]`, `ksu_manager_appid_count`, `ksu_get_manager_appid()`, `ksu_set_manager_appid(uid_t appid)`, `ksu_add_manager_appid(uid_t appid)`, `ksu_clear_manager_appids()`, `is_manager()`, `is_uid_manager(uid_t uid)`.
+- Produces: `ksu_manager_appids[]`, `ksu_manager_appid_count`, `ksu_get_manager_appid()`, `ksu_set_manager_appid(uid_t appid)`, `ksu_add_manager_appid(uid_t appid)`, `ksu_replace_manager_appids(const uid_t *appids, unsigned int count)`, `ksu_clear_manager_appids()`, `is_manager()`, `is_uid_manager(uid_t uid)`.
 - Consumes: Existing users of `ksu_get_manager_appid()`, `ksu_set_manager_appid()`, `is_manager()`, and `is_uid_manager()`.
 
 - [ ] Replace the single global manager app ID with fixed-size app ID storage.
@@ -40,8 +40,8 @@
 - Modify: `kernel/manager/throne_tracker.c`
 
 **Interfaces:**
-- Consumes: `ksu_clear_manager_appids()`, `ksu_add_manager_appid(uid_t appid)`, `ksu_is_manager_appid_valid()`.
-- Produces: Scanner behavior that adds every valid manager app ID found under `/data/app`.
+- Consumes: `ksu_replace_manager_appids(const uid_t *appids, unsigned int count)`.
+- Produces: Scanner behavior that collects every valid manager app ID found under `/data/app` and replaces the global set after scanning.
 
 - [ ] Update `crown_manager()` to add matching package app IDs instead of replacing one global value.
 - [ ] Update directory scanning to continue after valid manager APKs are found.
