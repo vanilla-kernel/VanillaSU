@@ -19,7 +19,8 @@
 #include "throne_tracker.h"
 #include "compat/kernel_compat.h"
 
-uid_t ksu_manager_appid = KSU_INVALID_APPID;
+struct ksu_active_manager ksu_active_managers[KSU_MAX_MANAGERS];
+int ksu_active_manager_count = 0;
 
 #define SYSTEM_PACKAGES_LIST_PATH "/data/system/packages.list"
 
@@ -30,7 +31,7 @@ struct uid_data {
 };
 
 static void crown_manager(const char *apk, struct list_head *uid_data,
-			  uid_t *manager_appid)
+			  int profile_index)
 {
 	char manager_pkg[KSU_MAX_PACKAGE_NAME];
 
@@ -45,12 +46,29 @@ static void crown_manager(const char *apk, struct list_head *uid_data,
 	struct uid_data *np;
 
 	list_for_each_entry (np, list, list) {
-		if (strncmp(np->package, manager_pkg, KSU_MAX_PACKAGE_NAME) == 0) {
-			pr_info("Crowning manager: %s(uid=%d)\n", manager_pkg,
-				np->uid);
-			*manager_appid = np->uid;
-			break;
+		if (strncmp(np->package, manager_pkg, KSU_MAX_PACKAGE_NAME) != 0)
+			continue;
+
+		int i;
+
+		// skip if this appid is already crowned
+		for (i = 0; i < ksu_active_manager_count; i++) {
+			if (ksu_active_managers[i].appid == np->uid)
+				return;
 		}
+
+		if (ksu_active_manager_count >= KSU_MAX_MANAGERS) {
+			pr_warn("manager table full, skipping %s\n", manager_pkg);
+			return;
+		}
+
+		pr_info("Crowning manager: %s(uid=%d)\n", manager_pkg, np->uid);
+		ksu_active_managers[ksu_active_manager_count].appid = np->uid;
+		ksu_active_managers[ksu_active_manager_count].profile_index =
+			profile_index;
+		// publish the fully-written slot to lockless readers
+		WRITE_ONCE(ksu_active_manager_count, ksu_active_manager_count + 1);
+		return;
 	}
 }
 
@@ -147,8 +165,7 @@ FILLDIR_RETURN_TYPE my_actor(struct dir_context *ctx, const char *name,
 	return FILLDIR_ACTOR_CONTINUE;
 }
 
-void search_manager(const char *path, int depth, struct list_head *uid_data,
-		    uid_t *manager_appid)
+void search_manager(const char *path, int depth, struct list_head *uid_data)
 {
 	int i, stop = 0;
 	struct list_head data_path_list;
@@ -198,13 +215,17 @@ void search_manager(const char *path, int depth, struct list_head *uid_data,
 			if (!strstarts(candidate_path, "/data/ap"))
 				goto skip_iterate;
 
-			if (likely(!is_manager_apk(candidate_path)))
+			int profile_index = ksu_match_manager_apk(candidate_path);
+			if (likely(profile_index < 0))
 				goto skip_iterate;
 
 			pr_info("Found manager base.apk at path: %s\n",
 				candidate_path);
-			crown_manager(candidate_path, uid_data, manager_appid);
-			stop = 1;
+			crown_manager(candidate_path, uid_data, profile_index);
+			// keep scanning: crown every installed manager, only stop
+			// once the active table is full
+			if (ksu_active_manager_count >= KSU_MAX_MANAGERS)
+				stop = 1;
 		skip_iterate:
 			list_del(&pos->list);
 			if (pos != &data)
@@ -324,16 +345,16 @@ static bool do_track_throne_core(bool prune_only)
 	// now update uid list
 	struct uid_data *np;
 	struct uid_data *n;
-	uid_t found_manager_appid = KSU_INVALID_APPID;
 
 	if (prune_only)
 		goto prune;
 
 	pr_info("Searching manager...\n");
-	search_manager("/data/app", 2, &uid_list, &found_manager_appid);
-	ksu_set_manager_appid(found_manager_appid);
-	pr_info("Search manager finished, manager appid=%d\n",
-		found_manager_appid);
+	// rebuild the active manager table from scratch on every full scan
+	WRITE_ONCE(ksu_active_manager_count, 0);
+	search_manager("/data/app", 2, &uid_list);
+	pr_info("Search manager finished, %d manager(s) active\n",
+		READ_ONCE(ksu_active_manager_count));
 
 prune:
 	// then prune the allowlist
