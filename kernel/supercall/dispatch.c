@@ -19,6 +19,7 @@
 #include "runtime/ksud_boot.h"
 #include "feature/kernel_umount.h"
 #include "manager/manager_identity.h"
+#include "manager/apk_sign.h"
 #include "selinux/selinux.h"
 #include "infra/file_wrapper.h"
 #include "hook/hook_manager.h"
@@ -46,6 +47,20 @@ static int do_grant_root(void __user *arg)
 
 static void fill_get_info_common(u32 *version, u32 *flags, u32 *features)
 {
+	const struct ksu_manager_profile *p =
+		ksu_get_manager_profile(ksu_caller_profile_index());
+
+	*features = KSU_FEATURE_MAX;
+
+	// auto-spoof version/features for the calling manager
+	if (p) {
+		if (p->spoof_version)
+			*version = p->spoof_version;
+		if (p->spoof_features)
+			*features = p->spoof_features;
+	}
+
+	// manual root override (CHANGE_KSUVER) always wins
 	if (ksuver_override) {
 		*version = ksuver_override;
 	}
@@ -60,7 +75,6 @@ static void fill_get_info_common(u32 *version, u32 *flags, u32 *features)
 	if (ksu_late_loaded) {
 		*flags |= KSU_GET_INFO_FLAG_LATE_LOAD;
 	}
-	*features = KSU_FEATURE_MAX;
 }
 
 static int do_get_info(void __user *arg)
@@ -70,8 +84,13 @@ static int do_get_info(void __user *arg)
 		.flags = 0,
 		.uapi_version = KERNEL_SU_UAPI_VERSION,
 	};
+	const struct ksu_manager_profile *p =
+		ksu_get_manager_profile(ksu_caller_profile_index());
 
 	fill_get_info_common(&cmd.version, &cmd.flags, &cmd.features);
+
+	if (p && p->spoof_uapi_version)
+		cmd.uapi_version = p->spoof_uapi_version;
 
 	if (copy_to_user(arg, &cmd, sizeof(cmd))) {
 		pr_err("get_version: copy_to_user failed\n");
@@ -585,11 +604,16 @@ static int do_get_hook_mode(void __user *arg)
 static int do_get_version_tag(void __user *arg)
 {
 	struct ksu_get_version_tag_cmd cmd = {0};
+	const struct ksu_manager_profile *p =
+		ksu_get_manager_profile(ksu_caller_profile_index());
+	// auto-spoof tag for the calling manager, else native
+	const char *tag = (p && p->spoof_version_tag) ? p->spoof_version_tag :
+							KERNEL_SU_VERSION_TAG;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
-	strscpy(cmd.tag, KERNEL_SU_VERSION_TAG, sizeof(cmd.tag));
+	strscpy(cmd.tag, tag, sizeof(cmd.tag));
 #else
-	strlcpy(cmd.tag, KERNEL_SU_VERSION_TAG, sizeof(cmd.tag));
+	strlcpy(cmd.tag, tag, sizeof(cmd.tag));
 #endif
 
 	if (copy_to_user(arg, &cmd, sizeof(cmd))) {
