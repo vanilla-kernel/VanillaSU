@@ -394,6 +394,7 @@ void __init ksu_syscall_hook_manager_init(void)
 	ksu_setuid_hook_init();
 	ksu_sucompat_init();
 	ksu_avc_spoof_init();
+	ksu_selinux_hide_status_init();
 }
 
 void __exit ksu_syscall_hook_manager_exit(void)
@@ -413,6 +414,7 @@ void __exit ksu_syscall_hook_manager_exit(void)
 	ksu_sucompat_exit();
 	ksu_setuid_hook_exit();
 	ksu_avc_spoof_exit();
+    ksu_selinux_hide_status_exit();
 }
 #else
 #include "klog.h" // IWYU pragma: keep
@@ -426,6 +428,7 @@ void __init ksu_syscall_hook_manager_init(void)
 	ksu_setuid_hook_init();
 	ksu_sucompat_init();
 	ksu_avc_spoof_init();
+	ksu_selinux_hide_status_init();
 }
 
 void __exit ksu_syscall_hook_manager_exit(void)
@@ -434,5 +437,6 @@ void __exit ksu_syscall_hook_manager_exit(void)
 	ksu_sucompat_exit();
 	ksu_setuid_hook_exit();
 	ksu_avc_spoof_exit();
+    ksu_selinux_hide_status_exit();
 }
 #endif

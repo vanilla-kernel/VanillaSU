@@ -114,6 +114,7 @@ int __init kernelsu_init(void)
 
 		apply_kernelsu_rules();
 		cache_sid();
+		ksu_selinux_hide_status_init();
 		setup_ksu_cred();
 
 		// Grant current process (ksud late-load) root
@@ -142,6 +143,8 @@ int __init kernelsu_init(void)
 		ksu_syscall_hook_manager_init();
 		
 		ksu_lsm_hook_init();
+
+		ksu_selinux_hide_status_init();
 
 		ksu_allowlist_init();
 
