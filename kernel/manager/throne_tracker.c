@@ -19,8 +19,7 @@
 #include "throne_tracker.h"
 #include "compat/kernel_compat.h"
 
-uid_t ksu_manager_appids[KSU_MAX_MANAGER_APPIDS];
-unsigned int ksu_manager_appid_count;
+uid_t ksu_manager_appid = KSU_INVALID_APPID;
 
 #define SYSTEM_PACKAGES_LIST_PATH "/data/system/packages.list"
 
@@ -30,32 +29,9 @@ struct uid_data {
 	char package[KSU_MAX_PACKAGE_NAME];
 };
 
-static void add_found_manager_appid(uid_t *appids, unsigned int *count,
-				    uid_t appid)
-{
-	unsigned int i;
-
-	if (appid == (uid_t)KSU_INVALID_APPID)
-		return;
-
-	for (i = 0; i < *count; i++) {
-		if (appids[i] == appid)
-			return;
-	}
-
-	if (*count >= KSU_MAX_MANAGER_APPIDS) {
-		pr_warn("manager appid set full, dropping uid=%u\n", appid);
-		return;
-	}
-
-	appids[*count] = appid;
-	(*count)++;
-}
-
 static void crown_manager(const char *apk,
 			  const struct ksu_manager_apk_identity *identity,
-			  struct list_head *uid_data, uid_t *manager_appids,
-			  unsigned int *manager_appid_count)
+			  struct list_head *uid_data, uid_t *manager_appid)
 {
 	const char *manager_pkg;
 
@@ -74,8 +50,7 @@ static void crown_manager(const char *apk,
 		if (strncmp(np->package, manager_pkg, KSU_MAX_PACKAGE_NAME) == 0) {
 			pr_info("Crowning manager: %s(uid=%d)\n", manager_pkg,
 				np->uid);
-			add_found_manager_appid(manager_appids,
-						manager_appid_count, np->uid);
+			*manager_appid = np->uid;
 			break;
 		}
 	}
@@ -168,7 +143,7 @@ FILLDIR_RETURN_TYPE my_actor(struct dir_context *ctx, const char *name,
 }
 
 void search_manager(const char *path, int depth, struct list_head *uid_data,
-		    uid_t *manager_appids, unsigned int *manager_appid_count)
+		    uid_t *manager_appid)
 {
 	int i;
 	struct list_head data_path_list;
@@ -223,7 +198,7 @@ void search_manager(const char *path, int depth, struct list_head *uid_data,
 			pr_info("Found manager base.apk at path: %s\n",
 				candidate_path);
 			crown_manager(candidate_path, &identity, uid_data,
-				      manager_appids, manager_appid_count);
+				      manager_appid);
 		skip_iterate:
 			list_del(&pos->list);
 			if (pos != &data)
@@ -343,19 +318,16 @@ static bool do_track_throne_core(bool prune_only)
 	// now update uid list
 	struct uid_data *np;
 	struct uid_data *n;
-	uid_t found_manager_appids[KSU_MAX_MANAGER_APPIDS] = { 0 };
-	unsigned int found_manager_appid_count = 0;
+	uid_t found_manager_appid = KSU_INVALID_APPID;
 
 	if (prune_only)
 		goto prune;
 
 	pr_info("Searching manager...\n");
-	search_manager("/data/app", 2, &uid_list, found_manager_appids,
-		       &found_manager_appid_count);
-	ksu_replace_manager_appids(found_manager_appids,
-				   found_manager_appid_count);
-	pr_info("Search manager finished, found %u managers\n",
-		found_manager_appid_count);
+	search_manager("/data/app", 2, &uid_list, &found_manager_appid);
+	ksu_set_manager_appid(found_manager_appid);
+	pr_info("Search manager finished, manager appid=%d\n",
+		found_manager_appid);
 
 prune:
 	// then prune the allowlist
