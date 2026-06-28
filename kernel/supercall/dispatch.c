@@ -46,14 +46,7 @@ static int do_grant_root(void __user *arg)
 
 static void fill_get_info_common(u32 *version, u32 *flags, u32 *features)
 {
-	uid_t uid = current_uid().val;
-	u32 spoof_ksu_driver_version;
-	u32 spoof_features;
-
-	if (ksu_get_manager_spoof_ksu_driver_version(
-		    uid, &spoof_ksu_driver_version)) {
-		*version = spoof_ksu_driver_version;
-	} else if (ksuver_override) {
+	if (ksuver_override) {
 		*version = ksuver_override;
 	}
 
@@ -68,8 +61,6 @@ static void fill_get_info_common(u32 *version, u32 *flags, u32 *features)
 		*flags |= KSU_GET_INFO_FLAG_LATE_LOAD;
 	}
 	*features = KSU_FEATURE_MAX;
-	if (ksu_get_manager_spoof_features(uid, &spoof_features))
-		*features = spoof_features;
 }
 
 static int do_get_info(void __user *arg)
@@ -79,12 +70,8 @@ static int do_get_info(void __user *arg)
 		.flags = 0,
 		.uapi_version = KERNEL_SU_UAPI_VERSION,
 	};
-	u32 spoof_uapi_version;
 
 	fill_get_info_common(&cmd.version, &cmd.flags, &cmd.features);
-	if (ksu_get_manager_spoof_uapi_version(current_uid().val,
-					       &spoof_uapi_version))
-		cmd.uapi_version = spoof_uapi_version;
 
 	if (copy_to_user(arg, &cmd, sizeof(cmd))) {
 		pr_err("get_version: copy_to_user failed\n");
@@ -598,16 +585,11 @@ static int do_get_hook_mode(void __user *arg)
 static int do_get_version_tag(void __user *arg)
 {
 	struct ksu_get_version_tag_cmd cmd = {0};
-	const char *ksu_version =
-		ksu_get_manager_spoof_ksu_version(current_uid().val);
-
-	if (!ksu_version)
-		ksu_version = KERNEL_SU_VERSION_TAG;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
-	strscpy(cmd.tag, ksu_version, sizeof(cmd.tag));
+	strscpy(cmd.tag, KERNEL_SU_VERSION_TAG, sizeof(cmd.tag));
 #else
-	strlcpy(cmd.tag, ksu_version, sizeof(cmd.tag));
+	strlcpy(cmd.tag, KERNEL_SU_VERSION_TAG, sizeof(cmd.tag));
 #endif
 
 	if (copy_to_user(arg, &cmd, sizeof(cmd))) {
