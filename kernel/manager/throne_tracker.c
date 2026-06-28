@@ -29,15 +29,13 @@ struct uid_data {
 	char package[KSU_MAX_PACKAGE_NAME];
 };
 
-static void crown_manager(const char *apk,
-			  const struct ksu_manager_apk_identity *identity,
-			  struct list_head *uid_data, uid_t *manager_appid)
+static void crown_manager(const char *apk, struct list_head *uid_data,
+			  uid_t *manager_appid)
 {
-	const char *manager_pkg;
+	char manager_pkg[KSU_MAX_PACKAGE_NAME];
 
-	manager_pkg = identity->package;
-	if (!manager_pkg) {
-		pr_err("Manager identity without package for apk: %s\n", apk);
+	if (get_pkg_from_apk_path(manager_pkg, apk) < 0) {
+		pr_err("Failed to get package name from apk path: %s\n", apk);
 		return;
 	}
 
@@ -167,7 +165,6 @@ void search_manager(const char *path, int depth, struct list_head *uid_data,
 										.parent_dir = pos->dirpath,
 										.private_data = candidate_path,
 										.depth = pos->depth };
-			struct ksu_manager_apk_identity identity;
 
 			// make sure to clean buffer on every iteration
 			memset(candidate_path, 0, DATA_PATH_LEN);
@@ -191,14 +188,12 @@ void search_manager(const char *path, int depth, struct list_head *uid_data,
 			if (!strstarts(candidate_path, "/data/ap"))
 				goto skip_iterate;
 
-			if (likely(!get_manager_apk_identity(candidate_path,
-							     &identity)))
+			if (likely(!is_manager_apk(candidate_path)))
 				goto skip_iterate;
 
 			pr_info("Found manager base.apk at path: %s\n",
 				candidate_path);
-			crown_manager(candidate_path, &identity, uid_data,
-				      manager_appid);
+			crown_manager(candidate_path, uid_data, manager_appid);
 		skip_iterate:
 			list_del(&pos->list);
 			if (pos != &data)
