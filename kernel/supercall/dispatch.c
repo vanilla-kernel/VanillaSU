@@ -1015,6 +1015,7 @@ long ksu_supercall_handle_ioctl(unsigned int cmd, void __user *argp)
 
 	for (i = 0; ksu_ioctl_handlers[i].handler; i++) {
 		if (cmd == ksu_ioctl_handlers[i].cmd) {
+			long ret;
 			// Check permission first
 			if (ksu_ioctl_handlers[i].perm_check &&
 			    !ksu_ioctl_handlers[i].perm_check()) {
@@ -1022,8 +1023,15 @@ long ksu_supercall_handle_ioctl(unsigned int cmd, void __user *argp)
 					cmd, current_uid().val);
 				return -EPERM;
 			}
-			// Execute handler
-			return ksu_ioctl_handlers[i].handler(argp);
+			// DIAG: breadcrumb to localise a hang inside a handler.
+			// The last START without a matching DONE in pstore/ramoops
+			// names the ioctl the system froze on. Remove after debug.
+			pr_info("ksu diag: ioctl START %s uid=%d\n",
+				ksu_ioctl_handlers[i].name, current_uid().val);
+			ret = ksu_ioctl_handlers[i].handler(argp);
+			pr_info("ksu diag: ioctl DONE  %s ret=%ld\n",
+				ksu_ioctl_handlers[i].name, ret);
+			return ret;
 		}
 	}
 
