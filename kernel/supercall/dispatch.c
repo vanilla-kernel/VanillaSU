@@ -60,9 +60,6 @@ static void fill_get_info_common(u32 *version, u32 *flags, u32 *features)
 	if (ksu_late_loaded) {
 		*flags |= KSU_GET_INFO_FLAG_LATE_LOAD;
 	}
-#ifdef EXPECTED_SIZE2
-	*flags |= KSU_GET_INFO_FLAG_PR_BUILD;
-#endif
 	*features = KSU_FEATURE_MAX;
 }
 
