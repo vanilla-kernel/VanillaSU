@@ -436,32 +436,57 @@ int get_pkg_from_apk_path(char *pkg, const char *path)
 }
 
 // Manager identity table. cert_size / cert_sha256 recognize the APK; the
-// spoof_* fields (left native here) are filled in per manager as needed.
+// spoof_* fields are auto-returned to that manager on GET_INFO / GET_VERSION_TAG.
+// Fill them per manager below; 0 / NULL = use the native kernel value.
+//   spoof_version      -> GET_INFO.version       (native: KERNEL_SU_VERSION)
+//   spoof_uapi_version -> GET_INFO.uapi_version  (native: KERNEL_SU_UAPI_VERSION)
+//   spoof_version_tag  -> GET_VERSION_TAG.tag    (native: KERNEL_SU_VERSION_TAG)
+//   spoof_features     -> GET_INFO.features      (native: KSU_FEATURE_MAX)
 static const struct ksu_manager_profile ksu_manager_profiles[] = {
 	{
 		.package = "me.weishu.kernelsu",
 		.cert_size = 0x33b,
 		.cert_sha256 = "c371061b19d8c7d7d6133c6a9bafe198fa944e50c1b31c9d8daa8d7f1fc2d2d6",
+		.spoof_version = 33168,
+		.spoof_uapi_version = 2,
+		.spoof_version_tag = NULL,
+		.spoof_features = 0,
 	},
 	{
 		.package = "com.rifsxd.ksunext",
 		.cert_size = 0x3e6,
 		.cert_sha256 = "79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7",
+		.spoof_version = 0,
+		.spoof_uapi_version = 0,
+		.spoof_version_tag = NULL,
+		.spoof_features = 0,
 	},
 	{
 		.package = "com.sukisu.ultra",
 		.cert_size = 0x35c,
 		.cert_sha256 = "947ae944f3de4ed4c21a7e4f7953ecf351bfa2b36239da37a34111ad29993eef",
+		.spoof_version = 0,
+		.spoof_uapi_version = 0,
+		.spoof_version_tag = NULL,
+		.spoof_features = 0,
 	},
 	{
 		.package = "com.resukisu.resukisu",
 		.cert_size = 0x377,
 		.cert_sha256 = "d3469712b6214462764a1d8d3e5cbe1d6819a0b629791b9f4101867821f1df64",
+		.spoof_version = 0,
+		.spoof_uapi_version = 0,
+		.spoof_version_tag = NULL,
+		.spoof_features = 0,
 	},
 	{
 		.package = "wffxxf.nclgit.cawxcw",
 		.cert_size = 0x396,
 		.cert_sha256 = "f415f4ed9435427e1fdf7f1fccd4dbc07b3d6b8751e4dbcec6f19671f427870b",
+		.spoof_version = 34992,
+		.spoof_uapi_version = 0,
+		.spoof_version_tag = NULL,
+		.spoof_features = 0,
 	},
 };
 
