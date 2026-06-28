@@ -74,6 +74,7 @@ struct my_dir_context {
 	char *parent_dir;
 	void *private_data;
 	int depth;
+	int *stop;
 };
 // https://docs.kernel.org/filesystems/porting.html
 // filldir_t (readdir callbacks) calling conventions have changed. Instead of returning 0 or -E... it returns bool now. false means "no more" (as -E... used to) and true - "keep going" (as 0 in old calling conventions). Rationale: callers never looked at specific -E... values anyway. -> iterate_shared() instances require no changes at all, all filldir_t ones in the tree converted.
@@ -102,6 +103,11 @@ FILLDIR_RETURN_TYPE my_actor(struct dir_context *ctx, const char *name,
 	my_ctx = container_of(ctx, struct my_dir_context, ctx);
 	candidate_path = (char *)my_ctx->private_data;
 
+	if (my_ctx->stop && *my_ctx->stop) {
+		pr_info("Stop searching\n");
+		return FILLDIR_ACTOR_STOP;
+	}
+
 	if (!strncmp(name, "..", namelen) || !strncmp(name, ".", namelen))
 		return FILLDIR_ACTOR_CONTINUE; // Skip "." and ".."
 
@@ -117,7 +123,8 @@ FILLDIR_RETURN_TYPE my_actor(struct dir_context *ctx, const char *name,
 		return FILLDIR_ACTOR_CONTINUE;
 	}
 
-	if ((d_type == DT_DIR || d_type == DT_UNKNOWN) && my_ctx->depth > 0) {
+	if ((d_type == DT_DIR || d_type == DT_UNKNOWN) && my_ctx->depth > 0 &&
+	    (my_ctx->stop && !*my_ctx->stop)) {
 		struct data_path *data = kzalloc(sizeof(struct data_path), GFP_KERNEL);
 
 		if (!data) {
@@ -143,7 +150,7 @@ FILLDIR_RETURN_TYPE my_actor(struct dir_context *ctx, const char *name,
 void search_manager(const char *path, int depth, struct list_head *uid_data,
 		    uid_t *manager_appid)
 {
-	int i;
+	int i, stop = 0;
 	struct list_head data_path_list;
 	INIT_LIST_HEAD(&data_path_list);
 
@@ -164,22 +171,25 @@ void search_manager(const char *path, int depth, struct list_head *uid_data,
 										.data_path_list = &data_path_list,
 										.parent_dir = pos->dirpath,
 										.private_data = candidate_path,
-										.depth = pos->depth };
+										.depth = pos->depth,
+										.stop = &stop };
 
 			// make sure to clean buffer on every iteration
 			memset(candidate_path, 0, DATA_PATH_LEN);
 
 			struct file *file;
 
-			file = ksu_filp_open_compat(pos->dirpath, O_RDONLY | O_NOFOLLOW, 0);
-			if (IS_ERR(file)) {
-				pr_err("Failed to open directory: %s, err: %ld\n",
-					pos->dirpath, PTR_ERR(file));
-				goto skip_iterate;
-			}
+			if (!stop) {
+				file = ksu_filp_open_compat(pos->dirpath, O_RDONLY | O_NOFOLLOW, 0);
+				if (IS_ERR(file)) {
+					pr_err("Failed to open directory: %s, err: %ld\n",
+						pos->dirpath, PTR_ERR(file));
+					goto skip_iterate;
+				}
 
-			iterate_dir(file, &ctx.ctx);
-			filp_close(file, NULL);
+				iterate_dir(file, &ctx.ctx);
+				filp_close(file, NULL);
+			}
 
 			// ^ oh so thats the issue!
 			// we were calling is_manager_apk inside iterate_dir
@@ -194,6 +204,7 @@ void search_manager(const char *path, int depth, struct list_head *uid_data,
 			pr_info("Found manager base.apk at path: %s\n",
 				candidate_path);
 			crown_manager(candidate_path, uid_data, manager_appid);
+			stop = 1;
 		skip_iterate:
 			list_del(&pos->list);
 			if (pos != &data)
