@@ -435,26 +435,70 @@ int get_pkg_from_apk_path(char *pkg, const char *path)
 	return 0;
 }
 
+// Manager identity table. cert_size / cert_sha256 recognize the APK; the
+// spoof_* fields (left native here) are filled in per manager as needed.
+static const struct ksu_manager_profile ksu_manager_profiles[] = {
+	{
+		.package = "me.weishu.kernelsu",
+		.cert_size = 0x33b,
+		.cert_sha256 = "c371061b19d8c7d7d6133c6a9bafe198fa944e50c1b31c9d8daa8d7f1fc2d2d6",
+	},
+	{
+		.package = "com.rifsxd.ksunext",
+		.cert_size = 0x3e6,
+		.cert_sha256 = "79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7",
+	},
+	{
+		.package = "com.sukisu.ultra",
+		.cert_size = 0x35c,
+		.cert_sha256 = "947ae944f3de4ed4c21a7e4f7953ecf351bfa2b36239da37a34111ad29993eef",
+	},
+	{
+		.package = "com.resukisu.resukisu",
+		.cert_size = 0x377,
+		.cert_sha256 = "d3469712b6214462764a1d8d3e5cbe1d6819a0b629791b9f4101867821f1df64",
+	},
+	{
+		.package = "wffxxf.nclgit.cawxcw",
+		.cert_size = 0x396,
+		.cert_sha256 = "f415f4ed9435427e1fdf7f1fccd4dbc07b3d6b8751e4dbcec6f19671f427870b",
+	},
+};
+
+#define KSU_MANAGER_PROFILE_COUNT ARRAY_SIZE(ksu_manager_profiles)
+
+const struct ksu_manager_profile *ksu_get_manager_profile(int index)
+{
+	if (index < 0 || index >= (int)KSU_MANAGER_PROFILE_COUNT)
+		return NULL;
+
+	return &ksu_manager_profiles[index];
+}
+
+int ksu_match_manager_apk(char *path)
+{
+	char pkg[KSU_MAX_PACKAGE_NAME];
+	bool have_pkg = get_pkg_from_apk_path(pkg, path) == 0;
+	int i;
+
+	for (i = 0; i < (int)KSU_MANAGER_PROFILE_COUNT; i++) {
+		const struct ksu_manager_profile *p = &ksu_manager_profiles[i];
+
+		// cheap reject by package name before the expensive signature check
+		if (p->package) {
+			if (!have_pkg ||
+			    strncmp(pkg, p->package, KSU_MAX_PACKAGE_NAME))
+				continue;
+		}
+
+		if (check_v2_signature(path, p->cert_size, p->cert_sha256))
+			return i;
+	}
+
+	return -1;
+}
+
 bool is_manager_apk(char *path)
 {
-#ifdef KSU_MANAGER_PACKAGE
-	char pkg[KSU_MAX_PACKAGE_NAME];
-
-	if (get_pkg_from_apk_path(pkg, path) < 0) {
-		pr_err("Failed to get package name from apk path: %s\n", path);
-		return false;
-	}
-
-	if (strncmp(pkg, KSU_MANAGER_PACKAGE, sizeof(KSU_MANAGER_PACKAGE))) {
-		return false;
-	}
-#endif
-	if (check_v2_signature(path, EXPECTED_SIZE, EXPECTED_HASH)) {
-		return true;
-	}
-#ifdef EXPECTED_SIZE2
-	return check_v2_signature(path, EXPECTED_SIZE2, EXPECTED_HASH2);
-#else
-	return false;
-#endif
+	return ksu_match_manager_apk(path) >= 0;
 }
