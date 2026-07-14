@@ -141,6 +141,12 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
             susfs_add_sus_kstat(arg);
             return 0;
         }
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT_REDIRECT
+        if (cmd == CMD_SUSFS_ADD_SUS_KSTAT_REDIRECT) {
+            susfs_add_sus_kstat_redirect(arg);
+            return 0;
+        }
+#endif
 #endif //#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 #ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
         if (cmd == CMD_SUSFS_ADD_TRY_UMOUNT) {
