@@ -98,6 +98,12 @@ int ksu_install_fd(void)
 	return fd;
 }
 
+/*
+ * Returned when a supercall was fully serviced: the caller must report success
+ * to userspace instead of letting the real sys_reboot reject our magic numbers.
+ */
+#define KSU_SUPERCALL_HANDLED 1
+
 int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
 			  void __user **arg)
 {
@@ -116,94 +122,94 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
         if (cmd == CMD_SUSFS_SET_ANDROID_DATA_ROOT_PATH ||
             cmd == CMD_SUSFS_SET_SDCARD_ROOT_PATH) {
             susfs_set_i_state_on_external_dir(arg);
-            return 0;
+            return KSU_SUPERCALL_HANDLED;
         }
         if (cmd == CMD_SUSFS_ADD_SUS_PATH) {
             susfs_add_sus_path(arg);
-            return 0;
+            return KSU_SUPERCALL_HANDLED;
         }
         if (cmd == CMD_SUSFS_ADD_SUS_PATH_LOOP) {
             susfs_add_sus_path_loop(arg);
-            return 0;
+            return KSU_SUPERCALL_HANDLED;
         }
 #endif //#ifdef CONFIG_KSU_SUSFS_SUS_PATH
 #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
         if (cmd == CMD_SUSFS_HIDE_SUS_MNTS_FOR_NON_SU_PROCS) {
             susfs_set_hide_sus_mnts_for_non_su_procs(arg);
-            return 0;
+            return KSU_SUPERCALL_HANDLED;
         }
 #endif //#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
         if (cmd == CMD_SUSFS_ADD_SUS_KSTAT) {
             susfs_add_sus_kstat(arg);
-            return 0;
+            return KSU_SUPERCALL_HANDLED;
         }
         if (cmd == CMD_SUSFS_UPDATE_SUS_KSTAT) {
             susfs_update_sus_kstat(arg);
-            return 0;
+            return KSU_SUPERCALL_HANDLED;
         }
         if (cmd == CMD_SUSFS_ADD_SUS_KSTAT_STATICALLY) {
             susfs_add_sus_kstat(arg);
-            return 0;
+            return KSU_SUPERCALL_HANDLED;
         }
 #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT_REDIRECT
         if (cmd == CMD_SUSFS_ADD_SUS_KSTAT_REDIRECT) {
             susfs_add_sus_kstat_redirect(arg);
-            return 0;
+            return KSU_SUPERCALL_HANDLED;
         }
 #endif
 #endif //#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 #ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
         if (cmd == CMD_SUSFS_ADD_TRY_UMOUNT) {
             susfs_add_try_umount(arg);
-            return 0;
+            return KSU_SUPERCALL_HANDLED;
         }
 #endif //#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
 #ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
         if (cmd == CMD_SUSFS_SET_UNAME) {
             susfs_set_uname(arg);
-            return 0;
+            return KSU_SUPERCALL_HANDLED;
         }
 #endif //#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
 #ifdef CONFIG_KSU_SUSFS_ENABLE_LOG
         if (cmd == CMD_SUSFS_ENABLE_LOG) {
             susfs_enable_log(arg);
-            return 0;
+            return KSU_SUPERCALL_HANDLED;
         }
 #endif //#ifdef CONFIG_KSU_SUSFS_ENABLE_LOG
 #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
         if (cmd == CMD_SUSFS_SET_CMDLINE_OR_BOOTCONFIG) {
             susfs_set_cmdline_or_bootconfig(arg);
-            return 0;
+            return KSU_SUPERCALL_HANDLED;
         }
 #endif //#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
 #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
         if (cmd == CMD_SUSFS_ADD_OPEN_REDIRECT) {
             susfs_add_open_redirect(arg);
-            return 0;
+            return KSU_SUPERCALL_HANDLED;
         }
 #endif //#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
         if (cmd == CMD_SUSFS_ADD_SUS_MAP) {
             susfs_add_sus_map(arg);
-            return 0;
+            return KSU_SUPERCALL_HANDLED;
         }
 #endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
         if (cmd == CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING) {
             susfs_set_avc_log_spoofing(arg);
-            return 0;
+            return KSU_SUPERCALL_HANDLED;
         }
         if (cmd == CMD_SUSFS_SHOW_ENABLED_FEATURES) {
             susfs_get_enabled_features(arg);
-            return 0;
+            return KSU_SUPERCALL_HANDLED;
         }
         if (cmd == CMD_SUSFS_SHOW_VARIANT) {
             susfs_show_variant(arg);
-            return 0;
+            return KSU_SUPERCALL_HANDLED;
         }
         if (cmd == CMD_SUSFS_SHOW_VERSION) {
             susfs_show_version(arg);
-            return 0;
+            return KSU_SUPERCALL_HANDLED;
         }
         return 0;
     }
@@ -363,9 +369,13 @@ static int reboot_handler_pre(struct kprobe *p, struct pt_regs *regs)
 	int magic2 = (int)PT_REGS_PARM2(real_regs);
 	unsigned int cmd = (unsigned int)PT_REGS_PARM3(real_regs);
 	unsigned long arg4 = (unsigned long)PT_REGS_SYSCALL_PARM4(real_regs);
-	unsigned long reply = (unsigned long)arg4;
 
-	return ksu_handle_sys_reboot(magic1, magic2, cmd, (void __user **)&arg4);
+	if (!ksu_handle_sys_reboot(magic1, magic2, cmd,
+				   (void __user **)&arg4))
+		return 0;
+
+	PT_REGS_SKIP_FUNC(regs, 0);
+	return 1;
 }
 
 static struct kprobe reboot_kp = {
