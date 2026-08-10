@@ -92,5 +92,23 @@
 #define PT_REAL_REGS(regs) ((regs))
 #endif
 
+/*
+ * Return from a kprobe'd function entry without executing its body: restore the
+ * caller's pc and hand back `rc` as the function's return value. Only valid from
+ * a pre_handler probing the first instruction of a function, and the handler
+ * must return non-zero afterwards so kprobes skips the single-step.
+ */
+#if defined(__aarch64__)
+#define PT_REGS_SKIP_FUNC(x, rc) do { \
+	PT_REGS_RC(x) = (rc); \
+	PT_REGS_IP(x) = PT_REGS_RET(x); \
+} while (0)
+#elif defined(__x86_64__)
+#define PT_REGS_SKIP_FUNC(x, rc) do { \
+	PT_REGS_IP(x) = *(unsigned long *)PT_REGS_SP(x); \
+	PT_REGS_SP(x) += sizeof(unsigned long); \
+	PT_REGS_RC(x) = (rc); \
+} while (0)
+#endif
 
 #endif
