@@ -191,6 +191,9 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
 #endif //#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
         if (cmd == CMD_SUSFS_ADD_SUS_MAP) {
+            /* kprobe pre-handlers are atomic; sus_map resolves paths and sleeps. */
+            if (in_atomic() || irqs_disabled())
+                return KSU_SUPERCALL_HANDLED;
             susfs_add_sus_map(arg);
             return KSU_SUPERCALL_HANDLED;
         }
