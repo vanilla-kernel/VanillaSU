@@ -268,8 +268,10 @@ static int ksu_hide_init_thread(void *data)
 {
 	set_user_nice(current, 19);
 
+	#ifndef KSU_KPROBES_HOOK
 	while (READ_ONCE(ksu_input_hook))
 		msleep(5000);
+	#endif
 
 	if (ksu_selinux_hide_is_enabled)
 		ksu_selinux_hide_enable();
