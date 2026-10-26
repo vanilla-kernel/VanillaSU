@@ -311,7 +311,11 @@ static bool do_track_throne_core(bool prune_only)
 		if (chr != '\n')
 			continue;
 
-		count = ksu_kernel_read_compat(fp, buf, sizeof(buf), &line_start);
+		count = ksu_kernel_read_compat(fp, buf, sizeof(buf) - 1, &line_start);
+		line_start = pos;
+		if (count <= 0)
+			continue;
+		buf[count] = '\0';
 
 		struct uid_data *data = kzalloc(sizeof(struct uid_data), GFP_KERNEL);
 		if (!data) {
@@ -326,21 +330,19 @@ static bool do_track_throne_core(bool prune_only)
 		if (!uid || !package) {
 			kfree(data);
 			pr_err("update_uid: package or uid is NULL!\n");
-			break;
+			continue;
 		}
 
 		u32 res;
 		if (kstrtou32(uid, 10, &res)) {
 			kfree(data);
 			pr_err("update_uid: uid parse err\n");
-			break;
+			continue;
 		}
 		data->uid = res;
 		memcpy(data->package, package, KSU_MAX_PACKAGE_NAME - 1);
 		data->package[KSU_MAX_PACKAGE_NAME - 1] = '\0';
 		list_add_tail(&data->list, &uid_list);
-		// reset line start
-		line_start = pos;
 	}
 	filp_close(fp, 0);
 
@@ -359,6 +361,9 @@ static bool do_track_throne_core(bool prune_only)
 		READ_ONCE(ksu_active_manager_count));
 
 prune:
+	if (list_empty(&uid_list))
+		goto out;
+
 	// then prune the allowlist
 	ksu_prune_allowlist(is_uid_exist, &uid_list);
 out:
