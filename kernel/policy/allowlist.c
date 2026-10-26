@@ -403,40 +403,51 @@ bool ksu_uid_should_umount(uid_t uid)
 #endif
 }
 
-void ksu_get_root_profile(uid_t uid, struct root_profile *profile)
+struct root_profile *ksu_get_root_profile(uid_t uid)
 {
+	struct root_profile *profile = kzalloc(sizeof(*profile), GFP_ATOMIC);
+	if (!profile)
+		return &default_root_profile;
+
 #ifdef CONFIG_KSU_DISABLE_POLICY
-    (void)uid;
-    memcpy(profile, &default_root_profile, sizeof(*profile));
-    return;
+	(void)uid;
+	memcpy(profile, &default_root_profile, sizeof(*profile));
+	return profile;
 #else
-    struct perm_data *p = NULL;
+	struct perm_data *p = NULL;
 
-    if (is_uid_manager(uid)) {
-        goto use_default;
-    }
+	if (is_uid_manager(uid)) {
+		goto use_default;
+	}
 
-    if (!__ksu_is_allow_uid(uid)) {
-        goto use_default;
-    }
+	if (!__ksu_is_allow_uid(uid)) {
+		goto use_default;
+	}
 
-    rcu_read_lock();
-    list_for_each_entry_rcu (p, &allow_list, list) {
-        if (uid == p->profile.curr_uid && p->profile.allow_su) {
-            if (!p->profile.rp_config.use_default) {
-                memcpy(profile, &p->profile.rp_config.profile,
-                       sizeof(*profile));
-                rcu_read_unlock();
-                return;
-            }
-        }
-    }
-    rcu_read_unlock();
+	rcu_read_lock();
+	list_for_each_entry_rcu (p, &allow_list, list) {
+		if (uid == p->profile.curr_uid && p->profile.allow_su) {
+			if (!p->profile.rp_config.use_default) {
+				memcpy(profile, &p->profile.rp_config.profile,
+				       sizeof(*profile));
+				rcu_read_unlock();
+				return profile;
+			}
+		}
+	}
+	rcu_read_unlock();
 
 use_default:
-    // use default profile
-    memcpy(profile, &default_root_profile, sizeof(*profile));
+	// use default profile
+	memcpy(profile, &default_root_profile, sizeof(*profile));
+	return profile;
 #endif
+}
+
+void ksu_put_root_profile(struct root_profile *profile)
+{
+	if (profile && profile != &default_root_profile)
+		kfree(profile);
 }
 
 bool ksu_get_allow_list(int *array, u16 length, u16 *out_length, u16 *out_total,
