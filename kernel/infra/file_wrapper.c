@@ -55,10 +55,15 @@ static const struct file_operations ksu_file_wrapper_inode_fops = {
     .open = ksu_wrapper_open
 };
 
-static loff_t ksu_wrapper_llseek(struct file *fp, loff_t off, int flags) {
-	struct ksu_file_wrapper* data = fp->private_data;
-	struct file* orig = data->orig;
-	return orig->f_op->llseek(data->orig, off, flags);
+static loff_t ksu_wrapper_llseek(struct file *fp, loff_t off, int flags)
+{
+	struct ksu_file_wrapper *data = fp->private_data;
+	struct file *orig = data->orig;
+	loff_t ret = orig->f_op->llseek(orig, off, flags);
+
+	if (ret >= 0)
+		fp->f_pos = orig->f_pos;
+	return ret;
 }
 
 static ssize_t ksu_wrapper_read(struct file *fp, char __user *ptr, size_t sz, loff_t *off) {
