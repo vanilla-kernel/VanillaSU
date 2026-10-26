@@ -170,9 +170,13 @@ static long ksu_wrapper_compat_ioctl(struct file *fp, unsigned int cmd, unsigned
 	return orig->f_op->compat_ioctl(orig, cmd, arg);
 }
 
-static int ksu_wrapper_mmap(struct file *fp, struct vm_area_struct * vma) {
-	struct ksu_file_wrapper* data = fp->private_data;
-	struct file* orig = data->orig;
+static int ksu_wrapper_mmap(struct file *fp, struct vm_area_struct *vma)
+{
+	struct ksu_file_wrapper *data = fp->private_data;
+	struct file *orig = data->orig;
+
+	fput(vma->vm_file);
+	vma->vm_file = get_file(orig);
 	return orig->f_op->mmap(orig, vma);
 }
 
