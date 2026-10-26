@@ -32,17 +32,17 @@
 
 #include "policy/app_profile.h"
 
+static inline bool is_zygote_normal_app_uid(uid_t uid)
+{
+	uid %= 100000;
+	return (uid >= 10000 && uid <= 19999);
+}
+
 #ifdef CONFIG_KSU_SUSFS
 static inline bool is_zygote_isolated_service_uid(uid_t uid)
 {
-    uid %= 100000;
-    return (uid >= 99000 && uid < 100000);
-}
-
-static inline bool is_zygote_normal_app_uid(uid_t uid)
-{
-    uid %= 100000;
-    return (uid >= 10000 && uid < 19999);
+	uid %= 100000;
+	return (uid >= 99000 && uid < 100000);
 }
 
 extern u32 susfs_zygote_sid;
@@ -102,9 +102,15 @@ int ksu_handle_setresuid(uid_t old_uid, uid_t new_uid)
     // we rely on the fact that zygote always call setresuid(3) with same uids
 
     // We only interest in process spwaned by zygote
-    if (!susfs_is_sid_equal(current_cred(), susfs_zygote_sid)) {
-        return 0;
-    }
+#ifdef CONFIG_KSU_SUSFS
+	if (!susfs_is_sid_equal(current_cred(), susfs_zygote_sid)) {
+		return 0;
+	}
+#else
+	if (!is_zygote(current_cred())) {
+		return 0;
+	}
+#endif
 
 #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
     // Check if spawned process is isolated service first, and force to do umount if so  
@@ -181,9 +187,11 @@ do_umount:
     //susfs_run_sus_path_loop(new_uid);
 #endif // #ifdef CONFIG_KSU_SUSFS_SUS_PATH
 
-    ksu_handle_extra_susfs_work();
+#ifdef CONFIG_KSU_SUSFS
+	ksu_handle_extra_susfs_work();
 
-    susfs_set_current_proc_umounted();
+	susfs_set_current_proc_umounted();
+#endif
 
     return 0;
 }
