@@ -825,7 +825,7 @@ static int sys_fstat_handler_post(struct kretprobe_instance *p,
 		pr_info("adding ksu_rc_len: %ld -> %ld", size, new_size);
 
 		// Attempt to overwrite the file size in userspace safely
-		if (!copy_to_user(st_size_ptr, &new_size, size_bytes)) {
+		if (!copy_to_user_nofault(st_size_ptr, &new_size, size_bytes)) {
 			pr_info("added ksu_rc_len");
 		} else {
 			pr_err("add ksu_rc_len failed: statbuf 0x%lx",
