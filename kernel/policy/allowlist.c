@@ -360,6 +360,13 @@ bool __ksu_is_allow_uid(uid_t uid)
 	return false;
 }
 
+bool ksu_is_uid_granted_root(uid_t uid)
+{
+	if (unlikely(uid == 0))
+		return is_ksu_domain();
+	return __ksu_is_allow_uid(uid);
+}
+
 bool __ksu_is_allow_uid_for_current(uid_t uid)
 {
 	if (unlikely(uid == 0)) {
