@@ -80,20 +80,20 @@ int ksu_sulog_handle_compat_dump(void __user *uptr)
 	unsigned long flags;
 
 	if (copy_from_user(&sbuf, uptr, sizeof(sbuf)))
-		return 1;
+		return -EFAULT;
 
 	if (!sbuf.index_ptr || !sbuf.buf_ptr || !sbuf.uptime_ptr)
-		return 1;
+		return -EFAULT;
 
 	ktime_get_boottime_ts64(&ts);
 	uptime = (uint32_t)ts.tv_sec;
 	if (copy_to_user((void __user *)(uintptr_t)sbuf.uptime_ptr, &uptime,
 			 sizeof(uptime)))
-		return 1;
+		return -EFAULT;
 
-	local_buf = kmalloc(sizeof(compat_sulog_buf), GFP_ATOMIC);
+	local_buf = kmalloc(sizeof(compat_sulog_buf), GFP_KERNEL);
 	if (!local_buf)
-		return 1;
+		return -ENOMEM;
 
 	spin_lock_irqsave(&compat_sulog_lock, flags);
 	local_idx = compat_sulog_idx;
@@ -103,13 +103,13 @@ int ksu_sulog_handle_compat_dump(void __user *uptr)
 	if (copy_to_user((void __user *)(uintptr_t)sbuf.index_ptr, &local_idx,
 			 sizeof(local_idx))) {
 		kfree(local_buf);
-		return 1;
+		return -EFAULT;
 	}
 
 	if (copy_to_user((void __user *)(uintptr_t)sbuf.buf_ptr, local_buf,
 			 sizeof(compat_sulog_buf))) {
 		kfree(local_buf);
-		return 1;
+		return -EFAULT;
 	}
 
 	kfree(local_buf);
