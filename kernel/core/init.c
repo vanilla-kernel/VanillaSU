@@ -66,10 +66,10 @@ __attribute__((no_stack_protector)) void __init ksu_setup_stack_chk_guard()
 
 __attribute__((naked)) int __init kernelsu_init_early(void)
 {
-    asm("mov x19, x30;\n"
-        "bl ksu_setup_stack_chk_guard;\n"
-        "mov x30, x19;\n"
-        "b kernelsu_init;\n");
+	asm("stp x19, x30, [sp, #-16]!\n"
+	    "bl ksu_setup_stack_chk_guard;\n"
+	    "ldp x19, x30, [sp], #16\n"
+	    "b kernelsu_init;\n");
 }
 #define NEED_OWN_STACKPROTECTOR 1
 #else
