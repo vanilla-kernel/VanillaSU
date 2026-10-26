@@ -733,8 +733,10 @@ static int ksu_execve_syscall_common(struct pt_regs *real_regs,
 	}
 	filename_in.name = path;
 
+	int fd = AT_FDCWD;
+
 	filename_p = &filename_in;
-	return ksu_handle_execveat_ksud(AT_FDCWD, &filename_p, &argv, NULL,
+	return ksu_handle_execveat_ksud(&fd, &filename_p, &argv, NULL,
 					NULL);
 }
 
@@ -914,11 +916,13 @@ static int ksu_execve_ksud_common(const char __user *filename_user,
 
 	path[sizeof(path) - 1] = '\0';
 
+	int fd = AT_FDCWD;
+
 	// this is because ksu_handle_execveat_ksud calls it filename->name
 	filename_in.name = path;
 	filename_p = &filename_in;
 
-	return ksu_handle_execveat_ksud(AT_FDCWD, &filename_p, argv, NULL,
+	return ksu_handle_execveat_ksud(&fd, &filename_p, argv, NULL,
 					NULL);
 }
 
