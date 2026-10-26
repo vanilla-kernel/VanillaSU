@@ -340,15 +340,28 @@ static ssize_t ksu_wrapper_copy_file_range(struct file *file_in, loff_t pos_in, 
 // https://cs.android.com/android/kernel/superproject/+/common-android-mainline:common/fs/remap_range.c;l=483-484;drc=398da7defe218d3e51b0f3bdff75147e28125b60
 static loff_t ksu_wrapper_remap_file_range(struct file *file_in, loff_t pos_in,
 				struct file *file_out, loff_t pos_out,
-				loff_t len, unsigned int remap_flags) {
+				loff_t len, unsigned int remap_flags)
+{
+	struct file *real_in = file_in;
+	struct file *real_out = file_out;
+
+	if (file_in->f_op->remap_file_range == ksu_wrapper_remap_file_range) {
+		struct ksu_file_wrapper *data = file_in->private_data;
+		real_in = data->orig;
+	}
+	if (file_out->f_op->remap_file_range == ksu_wrapper_remap_file_range) {
+		struct ksu_file_wrapper *data = file_out->private_data;
+		real_out = data->orig;
+	}
+
 	if (remap_flags & REMAP_FILE_DEDUP) {
-		struct ksu_file_wrapper* data = file_out->private_data;
-		struct file* orig = data->orig;
-		return orig->f_op->remap_file_range(file_in, pos_in, orig, pos_out, len, remap_flags);
+		return real_out->f_op->remap_file_range(real_in, pos_in,
+							real_out, pos_out,
+							len, remap_flags);
 	} else {
-		struct ksu_file_wrapper* data = file_in->private_data;
-		struct file* orig = data->orig;
-		return orig->f_op->remap_file_range(orig, pos_in, file_out, pos_out, len, remap_flags);
+		return real_in->f_op->remap_file_range(real_in, pos_in,
+						       real_out, pos_out,
+						       len, remap_flags);
 	}
 }
 #endif
