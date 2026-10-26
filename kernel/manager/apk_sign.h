@@ -17,7 +17,7 @@ struct ksu_manager_profile {
 };
 
 bool is_manager_apk(char *path);
-int get_pkg_from_apk_dir_path(char *pkg, const char *path);
+int get_pkg_from_apk_path(char *pkg, const char *path);
 
 // Returns the index of the matching manager profile, or -1 if none matched.
 int ksu_match_manager_apk(char *path);
