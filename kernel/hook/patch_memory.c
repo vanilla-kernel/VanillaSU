@@ -30,7 +30,7 @@
 #include "linux/uaccess.h"
 #include "linux/stop_machine.h"
 #include "asm/cacheflush.h"
-#include "asm-generic/fixmap.h"
+#include <asm/fixmap.h>
 
 // https://github.com/fuqiuluo/ovo/blob/f7da411458e87d32438dc14fce5a3313ed0c967e/ovo/mmuhack.c#L21
 
@@ -79,20 +79,30 @@ unsigned long phys_from_virt(unsigned long addr, int *err)
     pr_debug("pud of 0x%lx p=0x%lx v=0x%lx", addr, (uintptr_t)pud,
              (uintptr_t)pud_val(*pud));
 #if defined(pud_leaf)
-    if (pud_leaf(*pud)) {
-        pr_debug("Address 0x%lx maps to a PUD-level huge page\n", addr);
-        return __pud_to_phys(*pud) + ((addr & ~PUD_MASK));
-    }
+	if (pud_leaf(*pud)) {
+		pr_debug("Address 0x%lx maps to a PUD-level huge page\n", addr);
+		return __pud_to_phys(*pud) + ((addr & ~PUD_MASK));
+	}
+#elif defined(pud_sect)
+	if (pud_sect(*pud)) {
+		pr_debug("Address 0x%lx maps to a PUD-level huge page\n", addr);
+		return __pud_to_phys(*pud) + ((addr & ~PUD_MASK));
+	}
 #endif
 
-    pmd = pmd_offset(pud, addr);
-    pr_debug("pmd of 0x%lx p=0x%lx v=0x%lx", addr, (uintptr_t)pmd,
-             (uintptr_t)pmd_val(*pmd));
+	pmd = pmd_offset(pud, addr);
+	pr_debug("pmd of 0x%lx p=0x%lx v=0x%lx", addr, (uintptr_t)pmd,
+	         (uintptr_t)pmd_val(*pmd));
 #if defined(pmd_leaf)
-    if (pmd_leaf(*pmd)) {
-        pr_debug("Address 0x%lx maps to a PMD-level huge page\n", addr);
-        return __pmd_to_phys(*pmd) + ((addr & ~PMD_MASK));
-    }
+	if (pmd_leaf(*pmd)) {
+		pr_debug("Address 0x%lx maps to a PMD-level huge page\n", addr);
+		return __pmd_to_phys(*pmd) + ((addr & ~PMD_MASK));
+	}
+#elif defined(pmd_sect)
+	if (pmd_sect(*pmd)) {
+		pr_debug("Address 0x%lx maps to a PMD-level huge page\n", addr);
+		return __pmd_to_phys(*pmd) + ((addr & ~PMD_MASK));
+	}
 #endif
 
     if (pmd_none(*pmd) || pmd_bad(*pmd))
