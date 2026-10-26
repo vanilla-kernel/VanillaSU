@@ -164,20 +164,21 @@ static bool is_redundant_avtab_node(struct avtab_node *node)
 
 static bool remove_avtab_node(struct policydb *db, struct avtab_node *node)
 {
-    int i;
-    int ret;
-    // https://github.com/torvalds/linux/blob/v6.1/security/selinux/ss/avtab.c#L619
-    int shrink_size = sizeof(node->key.source_type) +
-                      sizeof(node->key.target_type) +
-                      sizeof(node->key.target_class) +
-                      sizeof(node->key.specified);
-    struct avtab removed = {};
-    struct avtab_node *n;
-    struct avtab_node *prev;
+	int i;
+	int ret;
+	// https://github.com/torvalds/linux/blob/v6.1/security/selinux/ss/avtab.c#L619
+	int shrink_size = sizeof(node->key.source_type) +
+			  sizeof(node->key.target_type) +
+			  sizeof(node->key.target_class) +
+			  sizeof(node->key.specified);
+	struct avtab removed = {};
+	struct avtab_node *n;
+	struct avtab_node *prev;
 
-    ret = avtab_alloc(&removed, 1);
-    if (ret < 0)
-        return false;
+	ret = avtab_alloc(&removed, 1);
+	if (ret < 0) {
+		return false;
+	}
 
 	for (i = 0; i < db->te_avtab.nslot; i++) {
 		prev = NULL;
@@ -226,8 +227,8 @@ static bool remove_avtab_node(struct policydb *db, struct avtab_node *node)
 		}
 	}
 
-    avtab_destroy(&removed);
-    return false;
+	avtab_destroy(&removed);
+	return false;
 }
 
 static bool add_rule(struct policydb *db, const char *s, const char *t,
