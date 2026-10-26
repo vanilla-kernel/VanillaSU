@@ -6,7 +6,22 @@
 #include <asm/syscall.h>
 #include <linux/ptrace.h>
 #include <linux/slab.h>
+#include <linux/uaccess.h>
 #include <trace/events/syscalls.h>
+
+#ifndef untagged_addr
+#define untagged_addr(addr) (addr)
+#endif
+
+#ifdef CONFIG_COMPAT
+#ifndef __NR_setresuid32
+#if defined(__NR_compat_setresuid32)
+#define __NR_setresuid32 __NR_compat_setresuid32
+#else
+#define __NR_setresuid32 208
+#endif
+#endif
+#endif
 
 #include "policy/allowlist.h"
 #include "policy/app_profile.h"
@@ -255,6 +270,9 @@ static inline bool check_syscall_fastpath(int nr)
 	case __NR_execveat:
 #endif
 	case __NR_setresuid:
+#ifdef CONFIG_COMPAT
+	case __NR_setresuid32:
+#endif
 		return true;
 	default:
 		return false;
@@ -308,21 +326,27 @@ static void ksu_sys_enter_handler(void *data, struct pt_regs *regs, long id)
 	if (unlikely(check_syscall_fastpath(id))) {
 		// Handle execve before the su_compat gate; adb_root is an independent feature.
 #ifdef __NR_execveat
-		if (id == __NR_execve || id == __NR_execveat) {
-#else
-		if (id == __NR_execve) {
+		if (id == __NR_execveat) {
+			const char __user **filename_user =
+				(const char __user **)&PT_REGS_PARM2(regs);
+			if (current->pid != 1 && is_init(current_cred())) {
+				ksu_handle_init_mark_tracker(filename_user);
+			} else if (ksu_su_compat_enabled) {
+				ksu_handle_execve_sucompat(filename_user, 0, regs);
+			}
+			return;
+		}
 #endif
+		if (id == __NR_execve) {
 			const char __user **filename_user =
 				(const char __user **)&PT_REGS_PARM1(regs);
 			if (current->pid != 1 && is_init(current_cred())) {
 				long ret;
 
 				ksu_handle_init_mark_tracker(filename_user);
-				if (id == __NR_execve) {
-					ret = ksu_adb_root_handle_execve(regs);
-					if (ret)
-						pr_err("adb root failed: %ld\n", ret);
-				}
+				ret = ksu_adb_root_handle_execve(regs);
+				if (ret)
+					pr_err("adb root failed: %ld\n", ret);
 			} else if (ksu_su_compat_enabled) {
 				ksu_handle_execve_sucompat(filename_user, 0, regs);
 			}
@@ -357,7 +381,11 @@ static void ksu_sys_enter_handler(void *data, struct pt_regs *regs, long id)
 		}
 
 		// Handle setresuid
+#ifdef CONFIG_COMPAT
+		if (id == __NR_setresuid || id == __NR_setresuid32) {
+#else
 		if (id == __NR_setresuid) {
+#endif
 			uid_t ruid = (uid_t)PT_REGS_PARM1(regs);
 			ksu_handle_setresuid(current_uid().val, ruid);
 			return;
