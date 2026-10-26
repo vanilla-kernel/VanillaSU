@@ -1052,6 +1052,11 @@ void ksu_handle_fstat64_ret(unsigned long *fd, struct stat64 __user **statbuf_pt
 
 void stop_init_rc_hook(void)
 {
+	static bool init_rc_stopped = false;
+	if (init_rc_stopped)
+		return;
+	init_rc_stopped = true;
+
 #ifdef KSU_KPROBES_HOOK
 	bool ret = schedule_work(&stop_init_rc_hook_work);
     pr_info("unregister init_rc_hook kprobe: %d!\n", ret);
