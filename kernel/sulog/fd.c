@@ -3,6 +3,7 @@
 #include <linux/fdtable.h>
 #include <linux/file.h>
 #include <linux/fs.h>
+#include <linux/init.h>
 #include <linux/mutex.h>
 #include <linux/poll.h>
 #include <linux/sched.h>
