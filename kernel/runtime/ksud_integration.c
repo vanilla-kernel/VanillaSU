@@ -991,11 +991,19 @@ static noinline void ksu_common_newfstat_ret(unsigned int fd_int, void **statbuf
 		return;
 
 	void __user *st_size_ptr;
-	long size, new_size;
+	long size = 0, new_size = 0;
 	size_t len;
 
-	st_size_ptr = statbuf + offsetof(struct stat, st_size);
-	len = sizeof(long);
+#ifdef CONFIG_COMPAT
+	if (in_compat_syscall()) {
+		st_size_ptr = statbuf + offsetof(struct compat_stat, st_size);
+		len = sizeof(compat_off_t);
+	} else
+#endif
+	{
+		st_size_ptr = statbuf + offsetof(struct stat, st_size);
+		len = sizeof(off_t);
+	}
 
 #if defined(__ARCH_WANT_STAT64) || defined(__ARCH_WANT_COMPAT_STAT64)
 	if (type) {
