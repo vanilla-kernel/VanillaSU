@@ -173,14 +173,17 @@ void cache_sid(void)
         pr_info("Cached su SID: %u\n", cached_su_sid);
     }
 
-    err = security_secctx_to_secid(ZYGOTE_CONTEXT, strlen(ZYGOTE_CONTEXT),
-                                   &cached_zygote_sid);
-    if (err) {
-        pr_warn("Failed to cache zygote SID: %d\n", err);
-        cached_zygote_sid = 0;
-    } else {
-        pr_info("Cached zygote SID: %u\n", cached_zygote_sid);
-    }
+	err = security_secctx_to_secid(ZYGOTE_CONTEXT, strlen(ZYGOTE_CONTEXT),
+								   &cached_zygote_sid);
+	if (err) {
+		pr_warn("Failed to cache zygote SID: %d\n", err);
+		cached_zygote_sid = 0;
+	} else {
+		pr_info("Cached zygote SID: %u\n", cached_zygote_sid);
+#ifdef CONFIG_KSU_SUSFS
+		susfs_zygote_sid = cached_zygote_sid;
+#endif
+	}
 
     err = security_secctx_to_secid(ADBD_CONTEXT, strlen(ADBD_CONTEXT),
                                    &cached_adbd_sid);
