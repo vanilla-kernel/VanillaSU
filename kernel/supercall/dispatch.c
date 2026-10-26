@@ -1006,7 +1006,7 @@ static const struct ksu_ioctl_cmd_map ksu_ioctl_handlers[] = {
 };
 // clang-format on
 
-long ksu_supercall_handle_ioctl(unsigned int cmd, void __user *argp)
+long ksu_supercall_handle_ioctl(const struct file *filp, unsigned int cmd, void __user *argp)
 {
 	int i;
 
@@ -1019,7 +1019,9 @@ long ksu_supercall_handle_ioctl(unsigned int cmd, void __user *argp)
 			long ret;
 			// Check permission first
 			if (ksu_ioctl_handlers[i].perm_check &&
-			    !ksu_ioctl_handlers[i].perm_check()) {
+			    !ksu_ioctl_handlers[i].perm_check() &&
+			    !(ksu_ioctl_handlers[i].allow_su_session &&
+			      ksu_is_su_session_fd(filp))) {
 				pr_warn("ksu ioctl: permission denied for cmd=0x%x uid=%d\n",
 					cmd, current_uid().val);
 				return -EPERM;
