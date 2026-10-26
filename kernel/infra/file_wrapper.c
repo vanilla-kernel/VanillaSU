@@ -32,21 +32,22 @@ static struct ksu_file_wrapper *ksu_create_file_wrapper(struct file *fp);
 
 static int ksu_wrapper_open(struct inode *ino, struct file *fp)
 {
-    struct path *orig_path = fp->f_path.dentry->d_fsdata;
-    struct file *orig_file =
-        dentry_open(orig_path, fp->f_flags, current_cred());
-    if (IS_ERR(orig_file)) {
-        return PTR_ERR(orig_file);
-    }
-    struct ksu_file_wrapper *wrapper = ksu_create_file_wrapper(orig_file);
-    if (IS_ERR(wrapper)) {
-        filp_close(orig_file, current->files);
-        return PTR_ERR(wrapper);
-    }
-    fp->private_data = wrapper;
-    const struct file_operations *new_fops = fops_get(&wrapper->ops);
-    replace_fops(fp, new_fops);
-    return 0;
+	struct path *orig_path = fp->f_path.dentry->d_fsdata;
+	struct file *orig_file =
+		dentry_open(orig_path, fp->f_flags, current_cred());
+	if (IS_ERR(orig_file)) {
+		return PTR_ERR(orig_file);
+	}
+	struct ksu_file_wrapper *wrapper = ksu_create_file_wrapper(orig_file);
+	if (IS_ERR(wrapper)) {
+		fput(orig_file);
+		return PTR_ERR(wrapper);
+	}
+	fput(orig_file);
+	fp->private_data = wrapper;
+	const struct file_operations *new_fops = fops_get(&wrapper->ops);
+	replace_fops(fp, new_fops);
+	return 0;
 }
 
 static const struct file_operations ksu_file_wrapper_inode_fops = {
