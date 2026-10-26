@@ -78,6 +78,8 @@ unsigned long __nocfi find_kernel_symbol_exact(const char *symbol_name)
     char buf[KSYM_SYMBOL_LEN];
 
     addr = kallsyms_lookup_name(symbol_name);
+    if (!addr)
+        return 0;
     // check if it is kernel symbol
     kallsyms_lookup(addr, NULL, NULL, &module_name, buf);
     if (unlikely(module_name)) {
@@ -98,11 +100,16 @@ static int lookup_symbol_variant_cb(void *data, const char *name, unsigned long 
 static int lookup_symbol_variant_cb(void *data, const char *name, struct module *mod, unsigned long addr)
 #endif
 {
-    struct ksu_lookup_symbol_ctx *ctx = data;
-    size_t name_len;
+	struct ksu_lookup_symbol_ctx *ctx = data;
+	size_t name_len;
 
-    if (!name || !addr)
-        return 0;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
+	if (mod)
+		return 0;
+#endif
+
+	if (!name || !addr)
+		return 0;
 
     name_len = strlen(name);
 
@@ -380,7 +387,7 @@ int __nocfi ksu_lookup_kernel_symbols(const char *const *names, unsigned long *a
     return ret;
 }
 
-void __init ksu_init_symbol_resolver()
+void __init ksu_init_symbol_resolver(void)
 {
 #if !ALWAYS_HAVE_ON_EACH_SYMBOL
     kallsyms_on_each_symbol_fn = find_kernel_symbol_exact("kallsyms_on_each_symbol");
