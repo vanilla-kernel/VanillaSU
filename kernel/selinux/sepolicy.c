@@ -179,52 +179,52 @@ static bool remove_avtab_node(struct policydb *db, struct avtab_node *node)
     if (ret < 0)
         return false;
 
-    for (i = 0; i < db->te_avtab.nslot; i++) {
-        prev = NULL;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
-        for (n = db->te_avtab.htable[i]; n; prev = n, n = n->next) {
+	for (i = 0; i < db->te_avtab.nslot; i++) {
+		prev = NULL;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0) || LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
+		for (n = db->te_avtab.htable[i]; n; prev = n, n = n->next) {
 #else
-        for (n = flex_array_get_ptr(db->te_avtab.htable, i); n;
-             prev = n, n = n->next) {
+		for (n = flex_array_get_ptr(db->te_avtab.htable, i); n;
+		     prev = n, n = n->next) {
 #endif
-            if (n != node)
-                continue;
+			if (n != node)
+				continue;
 
-            if (prev)
-                prev->next = n->next;
-            else {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
-                db->te_avtab.htable[i] = n->next;
+			if (prev)
+				prev->next = n->next;
+			else {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0) || LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
+				db->te_avtab.htable[i] = n->next;
 #else
-                flex_array_put_ptr(db->te_avtab.htable, i, n->next,
-                                   GFP_ATOMIC);
+				flex_array_put_ptr(db->te_avtab.htable, i, n->next,
+						   GFP_ATOMIC);
 #endif
-            }
+			}
 
-            if (db->te_avtab.nel > 0)
-                db->te_avtab.nel--;
+			if (db->te_avtab.nel > 0)
+				db->te_avtab.nel--;
 
-            if (n->key.specified & AVTAB_XPERMS)
-                // specified and driver are u8, perms.p holds 8 u32s
-                shrink_size += sizeof(n->datum.u.xperms->specified) +
-                               sizeof(n->datum.u.xperms->driver) +
-                               sizeof(n->datum.u.xperms->perms.p);
-            else
-                // data is u32
-                shrink_size += sizeof(n->datum.u.data);
-            n->next = NULL;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
-            removed.htable[0] = n;
+			if (n->key.specified & AVTAB_XPERMS)
+				// specified and driver are u8, perms.p holds 8 u32s
+				shrink_size += sizeof(n->datum.u.xperms->specified) +
+					       sizeof(n->datum.u.xperms->driver) +
+					       sizeof(n->datum.u.xperms->perms.p);
+			else
+				// data is u32
+				shrink_size += sizeof(n->datum.u.data);
+			n->next = NULL;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0) || LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
+			removed.htable[0] = n;
 #else
-            flex_array_put_ptr(removed.htable, 0, n, GFP_ATOMIC | __GFP_ZERO);
+			flex_array_put_ptr(removed.htable, 0, n, GFP_ATOMIC | __GFP_ZERO);
 #endif
-            removed.nel = 1;
-            avtab_destroy(&removed);
-            if (db->len >= shrink_size)
-                db->len -= shrink_size;
-            return true;
-        }
-    }
+			removed.nel = 1;
+			avtab_destroy(&removed);
+			if (db->len >= shrink_size)
+				db->len -= shrink_size;
+			return true;
+		}
+	}
 
     avtab_destroy(&removed);
     return false;
