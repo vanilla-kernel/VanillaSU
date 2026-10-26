@@ -508,7 +508,7 @@ append_ksu_rc:
 	}
 
 append_module_rc:
-	if (module_rc_pos < (ssize_t)module_rc_len) {
+	if (module_rc_pos < (ssize_t)module_rc_len && iov_iter_count(to)) {
 		append_count = copy_to_iter(module_rc_buf + module_rc_pos, module_rc_len - module_rc_pos, to);
 		if (!append_count) {
 			pr_info("read_iter_proxy: module append error, appended %zd\n", module_rc_pos);
