@@ -94,6 +94,7 @@ static bool is_selinux_setup(const char __user *const __user *argv_user)
     if (!argv_user || get_user(arg, argv_user + 1) || !arg)
         return false;
 
+	arg = (const char __user *)untagged_addr((unsigned long)arg);
     memset(buf, 0, sizeof(buf));
     if (strncpy_from_user(buf, arg, sizeof(buf) - 1) < 0)
         return false;
