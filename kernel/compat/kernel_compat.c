@@ -59,13 +59,19 @@ int path_mount(const char *dev_name, struct path *path, const char *type_page,
 {
 	mm_segment_t old_fs;
 	long ret = 0;
-	char buf[384];
+	char *page;
+	char *realpath;
 
-	char *realpath = d_path(path, buf, sizeof(buf));
+	page = (char *)__get_free_page(GFP_KERNEL);
+	if (!page)
+		return -ENOMEM;
+
+	realpath = d_path(path, page, PAGE_SIZE);
 	if (IS_ERR(realpath)) {
-		pr_err("ksu_mount: d_path failed, err: %lu\n",
-		       PTR_ERR(realpath));
-		return PTR_ERR(realpath);
+		ret = PTR_ERR(realpath);
+		pr_err("ksu_mount: d_path failed, err: %ld\n", ret);
+		free_page((unsigned long)page);
+		return ret;
 	}
 
 	old_fs = get_fs();
@@ -73,6 +79,7 @@ int path_mount(const char *dev_name, struct path *path, const char *type_page,
 	ret = do_mount(dev_name, (const char __user *)realpath, type_page,
 		       flags, data_page);
 	set_fs(old_fs);
+	free_page((unsigned long)page);
 	return ret;
 }
 #endif
