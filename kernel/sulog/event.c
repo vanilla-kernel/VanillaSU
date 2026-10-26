@@ -52,15 +52,16 @@ void ksu_compat_sulog(uint8_t sym)
 	struct compat_sulog_entry entry = { 0 };
 	unsigned int uid = current_uid().val;
 	struct timespec64 ts;
+	unsigned long flags;
 
 	ktime_get_boottime_ts64(&ts);
 	entry.s_time = (uint32_t)ts.tv_sec;
 	entry.data = (uid & 0x00FFFFFFU) | ((uint32_t)sym << 24);
 
-	spin_lock(&compat_sulog_lock);
+	spin_lock_irqsave(&compat_sulog_lock, flags);
 	compat_sulog_buf[compat_sulog_idx] = entry;
 	compat_sulog_idx = (compat_sulog_idx + 1) % COMPAT_SULOG_MAX;
-	spin_unlock(&compat_sulog_lock);
+	spin_unlock_irqrestore(&compat_sulog_lock, flags);
 }
 
 struct sulog_entry_rcv_ptr {
@@ -76,6 +77,7 @@ int ksu_sulog_handle_compat_dump(void __user *uptr)
 	uint8_t local_idx;
 	struct timespec64 ts;
 	struct compat_sulog_entry *local_buf;
+	unsigned long flags;
 
 	if (copy_from_user(&sbuf, uptr, sizeof(sbuf)))
 		return 1;
@@ -93,10 +95,10 @@ int ksu_sulog_handle_compat_dump(void __user *uptr)
 	if (!local_buf)
 		return 1;
 
-	spin_lock(&compat_sulog_lock);
+	spin_lock_irqsave(&compat_sulog_lock, flags);
 	local_idx = compat_sulog_idx;
 	memcpy(local_buf, compat_sulog_buf, sizeof(compat_sulog_buf));
-	spin_unlock(&compat_sulog_lock);
+	spin_unlock_irqrestore(&compat_sulog_lock, flags);
 
 	if (copy_to_user((void __user *)(uintptr_t)sbuf.index_ptr, &local_idx,
 			 sizeof(local_idx))) {
