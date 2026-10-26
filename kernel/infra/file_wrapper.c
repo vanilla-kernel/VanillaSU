@@ -32,6 +32,9 @@ static struct ksu_file_wrapper *ksu_create_file_wrapper(struct file *fp);
 
 static int ksu_wrapper_open(struct inode *ino, struct file *fp)
 {
+	if (!ksu_cred)
+		return -EPERM;
+
 	struct path *orig_path = fp->f_path.dentry->d_fsdata;
 	struct file *orig_file =
 		dentry_open(orig_path, fp->f_flags, current_cred());
@@ -566,7 +569,7 @@ err:
 	return file;
 }
 #else
-struct file *ksu_anon_inode_create_getfile_compat(
+static struct file *ksu_anon_inode_create_getfile_compat(
 	const char *name, const struct file_operations *fops, void *priv,
 	int flags, const struct inode *context_inode)
 {
@@ -604,6 +607,10 @@ int ksu_install_file_wrapper(int fd)
 	 * is not published until the caller's credentials have been restored and
 	 * its inode has been relabeled below.
 	 */
+	if (!ksu_cred) {
+		ret = -EPERM;
+		goto out_release_wrapper;
+	}
 	old_cred = override_creds(ksu_cred);
 	struct file *wrapper_file = ksu_anon_inode_create_getfile_compat(
 		"[ksu_fdwrapper]", &file_wrapper_data->ops, file_wrapper_data,
