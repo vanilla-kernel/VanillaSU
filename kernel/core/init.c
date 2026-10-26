@@ -4,6 +4,7 @@
 #include <linux/module.h>
 #include <linux/rcupdate.h>
 #include <linux/sched.h>
+#include <linux/version.h>
 #include <linux/workqueue.h>
 
 #include "policy/allowlist.h"
