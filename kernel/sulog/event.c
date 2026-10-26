@@ -220,7 +220,7 @@ static __u32 ksu_sulog_copy_filename(const char __user *filename_user,
 		return dst_len;
 	}
 
-	return ret + 1;
+	return ret;
 }
 
 static __u32 ksu_sulog_flatten_argv(const char __user *const __user *argv_user,
