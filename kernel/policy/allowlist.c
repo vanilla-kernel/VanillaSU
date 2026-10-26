@@ -512,14 +512,18 @@ static void do_persistent_allow_list(struct work_struct *work)
 		goto close_file;
 	}
 
-    mutex_lock(&allowlist_mutex);
-    list_for_each_entry (p, &allow_list, list) {
-        pr_info("save allow list, name: %s uid :%d, allow: %d\n",
-                p->profile.key, p->profile.curr_uid, p->profile.allow_su);
+	mutex_lock(&allowlist_mutex);
+	list_for_each_entry (p, &allow_list, list) {
+		pr_info("save allow list, name: %s uid :%d, allow: %d\n",
+			p->profile.key, p->profile.curr_uid, p->profile.allow_su);
 
-        ksu_kernel_write_compat(fp, &p->profile, sizeof(p->profile), &off);
-    }
-    mutex_unlock(&allowlist_mutex);
+		if (ksu_kernel_write_compat(fp, &p->profile, sizeof(p->profile), &off) != sizeof(p->profile)) {
+			pr_err("save_allow_list write profile failed for %s (uid: %d)\n",
+			       p->profile.key, p->profile.curr_uid);
+			break;
+		}
+	}
+	mutex_unlock(&allowlist_mutex);
 
 close_file:
     filp_close(fp, 0);
