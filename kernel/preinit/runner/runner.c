@@ -865,6 +865,8 @@ static int collect_modules(const char *preinit_dir)
     while ((n = getdents64(fd, (void *)buf, sizeof(buf))) > 0) {
         for (off = 0; off < n; off += d->d_reclen) {
             d = (struct linux_dirent64 *)(buf + off);
+			if (!d->d_reclen || off + d->d_reclen > n)
+				break;
             if (d->d_name[0] == '.' || strlen(d->d_name) >= MODID_MAX)
                 continue;
             if (count == MAX_MODULES) {
