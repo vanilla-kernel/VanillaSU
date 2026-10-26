@@ -74,18 +74,42 @@ static ssize_t ksu_wrapper_write(struct file *fp, const char __user *ptr, size_t
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)
-static ssize_t ksu_wrapper_read_iter(struct kiocb *iocb, struct iov_iter *iovi) {
-	struct ksu_file_wrapper* data = iocb->ki_filp->private_data;
-	struct file* orig = data->orig;
+static ssize_t ksu_wrapper_read_iter(struct kiocb *iocb, struct iov_iter *iovi)
+{
+	struct file *saved_filp;
+	struct ksu_file_wrapper *data;
+	struct file *orig;
+	ssize_t ret;
+
+	if (!is_sync_kiocb(iocb))
+		return -EOPNOTSUPP;
+
+	saved_filp = iocb->ki_filp;
+	data = saved_filp->private_data;
+	orig = data->orig;
 	iocb->ki_filp = orig;
-	return orig->f_op->read_iter(iocb, iovi);
+	ret = orig->f_op->read_iter(iocb, iovi);
+	iocb->ki_filp = saved_filp;
+	return ret;
 }
 
-static ssize_t ksu_wrapper_write_iter(struct kiocb *iocb, struct iov_iter *iovi) {
-	struct ksu_file_wrapper* data = iocb->ki_filp->private_data;
-	struct file* orig = data->orig;
+static ssize_t ksu_wrapper_write_iter(struct kiocb *iocb, struct iov_iter *iovi)
+{
+	struct file *saved_filp;
+	struct ksu_file_wrapper *data;
+	struct file *orig;
+	ssize_t ret;
+
+	if (!is_sync_kiocb(iocb))
+		return -EOPNOTSUPP;
+
+	saved_filp = iocb->ki_filp;
+	data = saved_filp->private_data;
+	orig = data->orig;
 	iocb->ki_filp = orig;
-	return orig->f_op->write_iter(iocb, iovi);
+	ret = orig->f_op->write_iter(iocb, iovi);
+	iocb->ki_filp = saved_filp;
+	return ret;
 }
 #endif
 
