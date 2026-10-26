@@ -1,3 +1,4 @@
+#include <linux/compiler.h>
 #include <linux/version.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
 #include <linux/fs.h>
@@ -64,4 +65,6 @@ void ksu_seccomp_allow_cache(struct seccomp_filter *filter, int nr)
     }
 #endif
 }
+#else
+static int ksu_seccomp_dummy __maybe_unused;
 #endif // #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
