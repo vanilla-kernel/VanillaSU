@@ -4,8 +4,12 @@
 #include <linux/fs.h>
 #include <linux/version.h>
 #include <linux/task_work.h>
-#include "ss/policydb.h"
-#include "linux/key.h"
+#include <linux/key.h>
+#include <linux/mm.h>
+#include <linux/uaccess.h>
+#include <linux/string.h>
+#include <linux/slab.h>
+#include <linux/vmalloc.h>
 
 /*
  * Adapt to Huawei HISI kernel without affecting other kernels ,
