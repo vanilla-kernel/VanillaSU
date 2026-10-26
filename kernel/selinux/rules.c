@@ -34,19 +34,21 @@ static DEFINE_MUTEX(ksu_rules);
 
 static struct policydb *get_policydb(void)
 {
-    struct policydb *db;
+	struct policydb *db;
 #ifdef KSU_COMPAT_USE_SELINUX_STATE
 #ifdef SELINUX_POLICY_INSTEAD_SELINUX_SS
-    struct selinux_policy *policy = selinux_state.policy;
-    db = &policy->policydb;
+	struct selinux_policy *policy = selinux_state.policy;
+	db = &policy->policydb;
 #else
-    struct selinux_ss *ss = selinux_state.ss;
-    db = &ss->policydb;
+	struct selinux_ss *ss = selinux_state.ss;
+	if (!ss)
+		return NULL;
+	db = &ss->policydb;
 #endif
 #else
-    db = &policydb;
+	db = &policydb;
 #endif
-    return db;
+	return db;
 }
 
 #if ((!defined(KSU_COMPAT_USE_SELINUX_STATE)) || \
@@ -84,7 +86,7 @@ static void reset_avc_cache()
 
 // rwlock
 #if defined(KSU_COMPAT_USE_SELINUX_STATE)
-static inline rwlock_t *ksu_get_policy_rwlock(void) { return &selinux_state.ss->policy_rwlock; }
+static inline rwlock_t *ksu_get_policy_rwlock(void) { return selinux_state.ss ? &selinux_state.ss->policy_rwlock : NULL; }
 #elif defined(KSU_COMPAT_HAS_EXPORTED_POLICY_RWLOCK)
 static inline rwlock_t *ksu_get_policy_rwlock(void) { extern rwlock_t policy_rwlock; return &policy_rwlock; }
 #else
