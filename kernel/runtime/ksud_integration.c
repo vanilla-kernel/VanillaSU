@@ -525,7 +525,7 @@ append_module_rc:
 	return ret;
 }
 
-static bool check_init_path(char *dpath)
+static __maybe_unused bool check_init_path(char *dpath)
 {
 	const char *valid_paths[] = { "/system/etc/init/hw/init.rc",
 				      "/init.rc" };
