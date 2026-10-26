@@ -33,21 +33,22 @@
 #define __weak __attribute__((weak))
 #endif
 
-__weak void ksu_handle_umount(uid_t old_uid, uid_t new_uid)
+__weak int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
 {
-    (void)old_uid;
-    (void)new_uid;
+	(void)old_uid;
+	(void)new_uid;
+	return 0;
 }
 
 void susfs_try_umount(uid_t new_uid)
 {
-    uid_t old_uid = current_uid().val;
-    ksu_handle_umount(old_uid, new_uid);
+	uid_t old_uid = current_uid().val;
+	ksu_handle_umount(old_uid, new_uid);
 }
 
-int susfs_add_try_umount(void __user *arg)
+__weak int susfs_add_try_umount(void __user **arg)
 {
-    return 0;
+	return 0;
 }
 
 #endif
