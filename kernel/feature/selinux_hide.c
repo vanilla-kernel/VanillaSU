@@ -3,6 +3,7 @@
 #include <linux/mm.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h>
 #include <linux/version.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 #include <asm/set_memory.h>
@@ -43,14 +44,16 @@ static u32 priv_app_sid __read_mostly = 0;
 
 static int ksu_selinux_get_sids(void)
 {
+	int err1, err2;
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
-	int err1 = security_context_to_sid("u:r:ksu:s0", strlen("u:r:ksu:s0"), &ksu_sid, GFP_KERNEL);
-    int err2 = security_context_to_sid("u:r:priv_app:s0:c512,c768", 
-                                       strlen("u:r:priv_app:s0:c512,c768"), &priv_app_sid, GFP_KERNEL);
+	err1 = security_context_to_sid("u:r:ksu:s0", strlen("u:r:ksu:s0"), &ksu_sid, GFP_KERNEL);
+	err2 = security_context_to_sid("u:r:priv_app:s0:c512,c768", 
+				       strlen("u:r:priv_app:s0:c512,c768"), &priv_app_sid, GFP_KERNEL);
 #else
-	int err1 = security_secctx_to_secid("u:r:ksu:s0", strlen("u:r:ksu:s0"), &ksu_sid);
-	int err2 = security_secctx_to_secid("u:r:priv_app:s0:c512,c768",
-					     strlen("u:r:priv_app:s0:c512,c768"), &priv_app_sid);
+	err1 = security_secctx_to_secid("u:r:ksu:s0", strlen("u:r:ksu:s0"), &ksu_sid);
+	err2 = security_secctx_to_secid("u:r:priv_app:s0:c512,c768",
+					 strlen("u:r:priv_app:s0:c512,c768"), &priv_app_sid);
 #endif
 	if (!err1) pr_info("ksu_selinux_hide: ksu_sid=%u\n", ksu_sid);
 	if (!err2) pr_info("ksu_selinux_hide: priv_app_sid=%u\n", priv_app_sid);
@@ -75,6 +78,11 @@ static void ksu_selinux_hide_disable(void)
 
 static void initialize_fake_status(void)
 {
+	struct page *real_page;
+	struct page *new_page;
+	struct selinux_kernel_status *status;
+	struct selinux_kernel_status *new_status;
+
 	if (READ_ONCE(fake_status))
 		return;
 
@@ -83,28 +91,28 @@ static void initialize_fake_status(void)
 		goto out;
 
 #ifdef KSU_COMPAT_USE_SELINUX_STATE
-	struct page *real_page = selinux_kernel_status_page(&selinux_state);
+	real_page = selinux_kernel_status_page(&selinux_state);
 #else
-	struct page *real_page = selinux_kernel_status_page();
+	real_page = selinux_kernel_status_page();
 #endif
 	if (!real_page) {
 		pr_warn("ksu_selinux_hide: status_page not exists\n");
 		goto out;
 	}
 
-	struct selinux_kernel_status *status = page_address(real_page);
+	status = page_address(real_page);
 	if (!status->enforcing && !ksu_late_loaded) {
 		pr_warn("ksu_selinux_hide: skip not enforcing\n");
 		goto out;
 	}
 
-	struct page *new_page = alloc_page(GFP_KERNEL | __GFP_ZERO);
+	new_page = alloc_page(GFP_KERNEL | __GFP_ZERO);
 	if (!new_page) {
 		pr_err("ksu_selinux_hide: failed to allocate fake status page\n");
 		goto out;
 	}
 
-	struct selinux_kernel_status *new_status = page_address(new_page);
+	new_status = page_address(new_page);
 	memcpy(new_status, status, sizeof(*status));
 	if (ksu_late_loaded && !new_status->enforcing) {
 		/*
@@ -130,12 +138,14 @@ static sel_open_handle_status_fn orig_sel_open_handle_status = NULL;
 
 static int __nocfi my_sel_open_handle_status(struct inode *inode, struct file *filp)
 {
+	struct page *data;
+
 	if (likely(test_thread_flag(TIF_SECCOMP) &&
-	current_uid().val >= 10000 &&
-		   ksu_selinux_hide_is_enabled)) {
-		struct page *data = READ_ONCE(fake_status);
+	    current_uid().val >= 10000 &&
+	    ksu_selinux_hide_is_enabled)) {
+		data = READ_ONCE(fake_status);
 		if (data) {
-			filp->private_data = page_address(data);
+			filp->private_data = data;
 			return 0;
 		}
 	}
@@ -151,16 +161,19 @@ static int patch_fops_open(struct file_operations *ops,
 	unsigned long addr = (unsigned long)&ops->open;
 	unsigned long base = addr & PAGE_MASK;
 	unsigned long offset = addr & ~PAGE_MASK;
-	
-	struct page *page = phys_to_page(__pa(base));
+	struct page *page;
+	void *writable_addr;
+	void **target_slot;
+
+	page = phys_to_page(__pa(base));
 	if (!page)
 		return -EFAULT;
 
-void *writable_addr = vmap(&page, 1, VM_MAP, PAGE_KERNEL);
+	writable_addr = vmap(&page, 1, VM_MAP, PAGE_KERNEL);
 	if (!writable_addr)
 		return -ENOMEM;
 
-	void **target_slot = (void **)((unsigned long)writable_addr + offset);
+	target_slot = (void **)((unsigned long)writable_addr + offset);
 
 	preempt_disable();
 	local_irq_disable();
@@ -176,16 +189,18 @@ void *writable_addr = vmap(&page, 1, VM_MAP, PAGE_KERNEL);
 static int resolve_fops(const char *path_str, struct file_operations **out_fops)
 {
 	struct path path;
-	int error = kern_path(path_str, LOOKUP_FOLLOW, &path);
+	int ret = -ENOENT;
+	int error;
+
+	error = kern_path(path_str, LOOKUP_FOLLOW, &path);
 	if (error) {
 		pr_err("ksu_selinux_hide: kern_path(%s) failed: %d\n", path_str, error);
 		return error;
 	}
-	
-	int ret = -ENOENT;
+
 	if (!path.dentry || !d_inode(path.dentry))
 		goto out;
-	
+
 	*out_fops = (struct file_operations *)d_inode(path.dentry)->i_fop;
 	if (!*out_fops)
 		goto out;
@@ -266,6 +281,8 @@ static const struct ksu_feature_handler selinux_hide_status_handler = {
 
 static int ksu_hide_init_thread(void *data)
 {
+	int tries = 0;
+
 	set_user_nice(current, 19);
 
 	#ifndef KSU_KPROBES_HOOK
@@ -276,7 +293,6 @@ static int ksu_hide_init_thread(void *data)
 	if (ksu_selinux_hide_is_enabled)
 		ksu_selinux_hide_enable();
 
-	int tries = 0;
 try_again:
 	initialize_fake_status();
 	if (READ_ONCE(fake_status))
@@ -293,6 +309,9 @@ page_ok:
 	hook_selinux_status_open();
 	return 0;
 }
+
+void ksu_selinux_hide_handle_second_stage(void) {}
+void ksu_selinux_hide_handle_post_fs_data(void) {}
 
 void __init ksu_selinux_hide_init(void)
 {
