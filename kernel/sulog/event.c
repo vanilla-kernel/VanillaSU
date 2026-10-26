@@ -131,6 +131,9 @@ ksu_sulog_user_argv(const char __user *const __user *argv_user)
 {
 	struct user_arg_ptr argv;
 
+	argv_user = (const char __user *const __user *)untagged_addr(
+		(unsigned long)argv_user);
+
 #ifdef CONFIG_COMPAT
 	if (unlikely(in_compat_syscall())) {
 		argv.is_compat = true;
