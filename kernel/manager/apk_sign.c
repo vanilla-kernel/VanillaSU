@@ -2,6 +2,7 @@
 #include <linux/fs.h>
 #include <linux/gfp.h>
 #include <linux/kernel.h>
+#include <linux/limits.h>
 #include <linux/slab.h>
 #include <linux/version.h>
 #ifdef CONFIG_KSU_DEBUG
@@ -221,7 +222,7 @@ static bool has_v1_signature_file(struct file *fp)
 	return found;
 }
 
-static __always_inline bool check_v2_signature(char *path,
+static __always_inline bool check_v2_signature(const char *path,
 						unsigned expected_size,
 						const char *expected_sha256)
 {
@@ -399,7 +400,7 @@ module_param_cb(ksu_debug_manager_appid, &expected_size_ops,
 int get_pkg_from_apk_path(char *pkg, const char *path)
 {
 	int len = strlen(path);
-	if (len >= KSU_MAX_PACKAGE_NAME || len < 1)
+	if (len >= PATH_MAX || len < 1)
 		return -1;
 
 	const char *last_slash = NULL;
@@ -450,16 +451,16 @@ static const struct ksu_manager_profile ksu_manager_profiles[] = {
 		.spoof_version = 32601,
 		.spoof_uapi_version = 2,
 		.spoof_version_tag = NULL,
-		.spoof_features = NULL,
+		.spoof_features = 0,
 	},
 	{
 		.package = "com.rifsxd.ksunext",
 		.cert_size = 0x3e6,
 		.cert_sha256 = "79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7",
-		.spoof_version = NULL,
-		.spoof_uapi_version = NULL,
+		.spoof_version = 0,
+		.spoof_uapi_version = 0,
 		.spoof_version_tag = NULL,
-		.spoof_features = NULL,
+		.spoof_features = 0,
 	},
 	{
 		.package = "com.resukisu.resukisu",
@@ -468,16 +469,16 @@ static const struct ksu_manager_profile ksu_manager_profiles[] = {
 		.spoof_version = 34992,
 		.spoof_uapi_version = 2,
 		.spoof_version_tag = NULL,
-		.spoof_features = NULL,
+		.spoof_features = 0,
 	},
 	{
 		.package = "wffxxf.nclgit.cawxcw",
 		.cert_size = 0x396,
 		.cert_sha256 = "f415f4ed9435427e1fdf7f1fccd4dbc07b3d6b8751e4dbcec6f19671f427870b",
-		.spoof_version = NULL,
-		.spoof_uapi_version = NULL,
+		.spoof_version = 0,
+		.spoof_uapi_version = 0,
 		.spoof_version_tag = NULL,
-		.spoof_features = NULL,
+		.spoof_features = 0,
 	},
 };
 
@@ -491,7 +492,7 @@ const struct ksu_manager_profile *ksu_get_manager_profile(int index)
 	return &ksu_manager_profiles[index];
 }
 
-int ksu_match_manager_apk(char *path)
+int ksu_match_manager_apk(const char *path)
 {
 	char pkg[KSU_MAX_PACKAGE_NAME];
 	bool have_pkg = get_pkg_from_apk_path(pkg, path) == 0;
@@ -514,7 +515,7 @@ int ksu_match_manager_apk(char *path)
 	return -1;
 }
 
-bool is_manager_apk(char *path)
+bool is_manager_apk(const char *path)
 {
 	return ksu_match_manager_apk(path) >= 0;
 }

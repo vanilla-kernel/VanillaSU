@@ -16,12 +16,34 @@ struct ksu_manager_profile {
 	u32 spoof_features; // 0 = native KSU_FEATURE_MAX
 };
 
-bool is_manager_apk(char *path);
+#ifdef CONFIG_KSU_DISABLE_MANAGER
+static inline bool is_manager_apk(const char *path)
+{
+	return false;
+}
+
+static inline int get_pkg_from_apk_path(char *pkg, const char *path)
+{
+	return -1;
+}
+
+static inline int ksu_match_manager_apk(const char *path)
+{
+	return -1;
+}
+
+static inline const struct ksu_manager_profile *ksu_get_manager_profile(int index)
+{
+	return NULL;
+}
+#else
+bool is_manager_apk(const char *path);
 int get_pkg_from_apk_path(char *pkg, const char *path);
 
 // Returns the index of the matching manager profile, or -1 if none matched.
-int ksu_match_manager_apk(char *path);
+int ksu_match_manager_apk(const char *path);
 // Returns the profile at index, or NULL if index is out of range.
 const struct ksu_manager_profile *ksu_get_manager_profile(int index);
+#endif
 
 #endif
