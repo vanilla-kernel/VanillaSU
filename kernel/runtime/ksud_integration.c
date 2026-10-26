@@ -301,9 +301,8 @@ int ksu_handle_execveat_ksud(int *fd, struct filename **filename_ptr,
 		return 0;
 
 	filename = *filename_ptr;
-	if (IS_ERR(filename)) {
+	if (IS_ERR_OR_NULL(filename))
 		return 0;
-	}
 
 	if (unlikely(!memcmp(filename->name, system_bin_init,
 				sizeof(system_bin_init) - 1) &&
