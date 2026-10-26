@@ -43,6 +43,11 @@ void __init ksu_preinit_init(void)
         return;
     }
 
+	if (!size) {
+		pr_info("preinit: no runner embedded\n");
+		return;
+	}
+
     file = shmem_file_setup("ksu_preinit", size, 0);
     if (IS_ERR(file)) {
         pr_err("preinit: shmem_file_setup failed: %ld\n", PTR_ERR(file));
