@@ -3,22 +3,22 @@
 
 #include <linux/types.h>
 #ifdef CONFIG_KSU_DISABLE_MANAGER
-static inline void ksu_throne_tracker_init()
+static inline void ksu_throne_tracker_init(void)
 {
 }
 
-static inline void ksu_throne_tracker_exit()
+static inline void ksu_throne_tracker_exit(void)
 {
 }
 
 static inline void track_throne(bool prune_only)
 {
-    (void)prune_only;
+	(void)prune_only;
 }
 #else
-void ksu_throne_tracker_init();
+void ksu_throne_tracker_init(void);
 
-void ksu_throne_tracker_exit();
+void ksu_throne_tracker_exit(void);
 
 void track_throne(bool prune_only);
 #endif

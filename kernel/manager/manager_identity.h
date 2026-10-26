@@ -3,6 +3,7 @@
 
 #include <linux/cred.h>
 #include <linux/types.h>
+#include <linux/uidgid.h>
 
 #define KSU_INVALID_APPID -1
 #define KSU_PER_USER_RANGE 100000
@@ -10,38 +11,38 @@
 #define KSU_MAX_MANAGERS 8
 
 #ifdef CONFIG_KSU_DISABLE_MANAGER
-static inline bool ksu_is_manager_appid_valid()
+static inline bool ksu_is_manager_appid_valid(void)
 {
-    return true;
+	return true;
 }
 
-static inline bool is_manager()
+static inline bool is_manager(void)
 {
-    return current_uid().val == 0;
+	return current_uid().val == 0;
 }
 
 static inline bool is_uid_manager(uid_t uid)
 {
-    return uid == 0;
+	return uid == 0;
 }
 
-static inline uid_t ksu_get_manager_appid()
+static inline uid_t ksu_get_manager_appid(void)
 {
-    return 0;
+	return 0;
 }
 
 static inline void ksu_set_manager_appid(uid_t appid)
 {
-    (void)appid;
+	(void)appid;
 }
 
-static inline void ksu_invalidate_manager_uid()
+static inline void ksu_invalidate_manager_uid(void)
 {
 }
 
 static inline int ksu_caller_profile_index(void)
 {
-    return -1;
+	return -1;
 }
 #else
 // Several managers can be active at once. Slots are written under the throne
@@ -55,7 +56,7 @@ struct ksu_active_manager {
 extern struct ksu_active_manager ksu_active_managers[KSU_MAX_MANAGERS]; // DO NOT DIRECT USE
 extern int ksu_active_manager_count; // DO NOT DIRECT USE
 
-static inline bool ksu_is_manager_appid_valid()
+static inline bool ksu_is_manager_appid_valid(void)
 {
 	return READ_ONCE(ksu_active_manager_count) > 0;
 }
@@ -73,12 +74,12 @@ static inline bool is_uid_manager(uid_t uid)
 	return false;
 }
 
-static inline bool is_manager()
+static inline bool is_manager(void)
 {
 	return is_uid_manager(current_uid().val);
 }
 
-static inline uid_t ksu_get_manager_appid()
+static inline uid_t ksu_get_manager_appid(void)
 {
 	if (READ_ONCE(ksu_active_manager_count) > 0)
 		return ksu_active_managers[0].appid;
@@ -93,7 +94,7 @@ static inline void ksu_set_manager_appid(uid_t appid)
 	WRITE_ONCE(ksu_active_manager_count, 1);
 }
 
-static inline void ksu_invalidate_manager_uid()
+static inline void ksu_invalidate_manager_uid(void)
 {
 	WRITE_ONCE(ksu_active_manager_count, 0);
 }
