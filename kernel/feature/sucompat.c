@@ -65,9 +65,10 @@ static void __user *userspace_stack_buffer(const void *d, size_t len)
 	// We also subtract a safe margin (256 bytes) 
 	// to avoid corrupting local variables or smth
 	unsigned long sp = current_user_stack_pointer();
-	sp = (sp - len - 256) & ~0xFUL; // Align downwards to nearest 16 bytes
+	char __user *p;
 
-	char __user *p = (char __user *)sp;
+	sp = (sp - len - 256) & ~0xFUL; // Align downwards to nearest 16 bytes
+	p = (char __user *)sp;
 
 	return copy_to_user(p, d, len) ? NULL : p;
 }
@@ -90,12 +91,15 @@ int ksu_handle_faccessat(int *dfd, const char __user **filename_user,
 		int *mode, int *__unused_flags)
 {
 	const char su[] = SU_PATH;
+	char path[sizeof(su) + 1];
 
 	if (!ksu_is_allow_uid_for_current(current_uid().val)) {
 		return 0;
 	}
 
-	char path[sizeof(su) + 1];
+	if (unlikely(!filename_user || !*filename_user))
+		return 0;
+
 	memset(path, 0, sizeof(path));
 	strncpy_from_user_nofault(path, *filename_user, sizeof(path));
 
@@ -112,6 +116,7 @@ int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags)
 {
 	// const char sh[] = SH_PATH;
 	const char su[] = SU_PATH;
+	char path[sizeof(su) + 1];
 
 	if (!ksu_is_allow_uid_for_current(current_uid().val)) {
 		return 0;
@@ -121,7 +126,6 @@ int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags)
 		return 0;
 	}
 
-	char path[sizeof(su) + 1];
 	memset(path, 0, sizeof(path));
 	strncpy_from_user_nofault(path, *filename_user, sizeof(path));
 
@@ -223,6 +227,9 @@ int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
 
 int __ksu_handle_devpts(struct inode *inode)
 {
+	uid_t uid;
+	struct inode_security_struct *sec;
+
 #ifndef KSU_KPROBES_HOOK
 	if (!ksu_su_compat_enabled)
 		return 0;
@@ -232,7 +239,7 @@ int __ksu_handle_devpts(struct inode *inode)
 		return 0;
 	}
 
-	uid_t uid = current_uid().val;
+	uid = current_uid().val;
 	if (uid % 100000 < 10000) {
 		// not untrusted_app, ignore it
 		return 0;
@@ -241,7 +248,7 @@ int __ksu_handle_devpts(struct inode *inode)
 	if (likely(!ksu_is_allow_uid(uid)))
 		return 0;
 
-	struct inode_security_struct *sec = selinux_inode(inode);
+	sec = selinux_inode(inode);
 
 	if (ksu_file_sid && sec)
 		sec->sid = ksu_file_sid;
