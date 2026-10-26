@@ -3,6 +3,7 @@
 
 #include <linux/compiler_types.h>
 #include <linux/gfp.h>
+#include <linux/init.h>
 #include <linux/types.h>
 #include "uapi/sulog.h" // IWYU pragma: keep
 
