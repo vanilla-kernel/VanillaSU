@@ -78,6 +78,8 @@ __attribute__((naked)) int __init kernelsu_init_early(void)
 
 struct cred *ksu_cred;
 bool ksu_late_loaded;
+bool ksu_no_custom_rc = false;
+module_param_named(norc, ksu_no_custom_rc, bool, 0);
 
 int __init kernelsu_init(void)
 {
