@@ -161,9 +161,9 @@ static void free_module_rc(void)
 	module_rc_len = 0;
 }
 
-void stop_init_rc_hook();
-void stop_execve_hook();
-void ksu_stop_input_hook_runtime();
+void stop_init_rc_hook(void);
+void stop_execve_hook(void);
+void ksu_stop_input_hook_runtime(void);
 
 #ifdef KSU_KPROBES_HOOK
 static struct work_struct __maybe_unused stop_init_rc_hook_work;
@@ -675,7 +675,7 @@ int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code,
 	return 0;
 }
 
-bool ksu_is_safe_mode()
+bool ksu_is_safe_mode(void)
 {
 	static bool safe_mode = false;
 	if (safe_mode) {
@@ -1039,7 +1039,7 @@ void ksu_handle_fstat64_ret(unsigned long *fd, struct stat64 __user **statbuf_pt
 
 #endif
 
-void stop_init_rc_hook()
+void stop_init_rc_hook(void)
 {
 #ifdef KSU_KPROBES_HOOK
 	bool ret = schedule_work(&stop_init_rc_hook_work);
@@ -1050,7 +1050,7 @@ void stop_init_rc_hook()
 #endif
 }
 
-void stop_execve_hook()
+void stop_execve_hook(void)
 {
 #ifdef KSU_KPROBES_HOOK
 	bool ret = schedule_work(&stop_execve_hook_work);
@@ -1061,7 +1061,7 @@ void stop_execve_hook()
 #endif
 }
 
-void ksu_stop_input_hook_runtime()
+void ksu_stop_input_hook_runtime(void)
 {
 #ifdef KSU_KPROBES_HOOK
 	static bool input_hook_stopped = false;
@@ -1082,7 +1082,7 @@ void ksu_stop_input_hook_runtime()
 
 
 // ksud: module support
-void __init ksu_ksud_init()
+void __init ksu_ksud_init(void)
 {
 #ifdef KSU_KPROBES_HOOK
 	int ret;
@@ -1113,7 +1113,7 @@ void __init ksu_ksud_init()
 #endif
 }
 
-void __exit ksu_ksud_exit()
+void __exit ksu_ksud_exit(void)
 {
 #ifdef KSU_KPROBES_HOOK
 	unregister_kprobe(&execveat_kp);

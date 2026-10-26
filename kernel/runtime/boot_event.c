@@ -52,7 +52,7 @@ void ksu_recheck_ksud(void)
 	schedule_work(&ksu_check_ksud_work);
 }
 
-extern void ksu_avc_spoof_late_init();
+extern void ksu_avc_spoof_late_init(void);
 
 void on_post_fs_data(void)
 {
