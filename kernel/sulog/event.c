@@ -156,14 +156,16 @@ static const char __user *ksu_sulog_get_user_arg_ptr(struct user_arg_ptr argv,
 	if (unlikely(argv.is_compat)) {
 		compat_uptr_t compat;
 
-		if (get_user(compat, argv.ptr.compat + nr))
+		if (copy_from_user_nofault(&compat, argv.ptr.compat + nr,
+					   sizeof(compat)))
 			return ERR_PTR(-EFAULT);
 
 		return compat_ptr(compat);
 	}
 #endif
 
-	if (get_user(native, argv.ptr.native + nr))
+	if (copy_from_user_nofault(&native, argv.ptr.native + nr,
+				   sizeof(native)))
 		return ERR_PTR(-EFAULT);
 
 	return native;
