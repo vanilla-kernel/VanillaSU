@@ -104,7 +104,7 @@ void ksu_show_allow_list(void)
     pr_info("ksu_show_allow_list\n");
     rcu_read_lock();
     list_for_each_entry_rcu (p, &allow_list, list) {
-        pr_info("uid :%d, allow: %d\n", p->profile.current_uid,
+        pr_info("uid :%d, allow: %d\n", p->profile.curr_uid,
                 p->profile.allow_su);
     }
     rcu_read_unlock();
@@ -116,7 +116,7 @@ static void ksu_grant_root_to_shell()
     struct app_profile profile = {
         .version = KSU_APP_PROFILE_VER,
         .allow_su = true,
-        .current_uid = 2000,
+        .curr_uid = 2000,
     };
     strcpy(profile.key, "com.android.shell");
     strcpy(profile.rp_config.profile.selinux_domain,
@@ -132,7 +132,7 @@ bool ksu_get_app_profile(struct app_profile *profile)
 
     rcu_read_lock();
     list_for_each_entry_rcu (p, &allow_list, list) {
-        bool uid_match = profile->current_uid == p->profile.current_uid;
+        bool uid_match = profile->curr_uid == p->profile.curr_uid;
         if (uid_match) {
             // found it, override it with ours
             memcpy(profile, &p->profile, sizeof(*profile));
@@ -216,7 +216,7 @@ int ksu_set_app_profile(struct app_profile *profile)
     list_for_each_entry (p, &allow_list, list) {
         ++count;
         // both uid and package must match, otherwise it will break multiple package with different user id
-        if (profile->current_uid == p->profile.current_uid &&
+        if (profile->curr_uid == p->profile.curr_uid &&
             !strcmp(profile->key, p->profile.key)) {
             // found it, just override it all!
             np = (struct perm_data *)kzalloc(sizeof(struct perm_data),
@@ -249,12 +249,12 @@ int ksu_set_app_profile(struct app_profile *profile)
     memcpy(&p->profile, profile, sizeof(*profile));
     if (profile->allow_su) {
         pr_info("set root profile, key: %s, uid: %d, gid: %d, context: %s\n",
-                profile->key, profile->current_uid,
+                profile->key, profile->curr_uid,
                 profile->rp_config.profile.gid,
                 profile->rp_config.profile.selinux_domain);
     } else {
         pr_info("set app profile, key: %s, uid: %d, umount modules: %d\n",
-                profile->key, profile->current_uid,
+                profile->key, profile->curr_uid,
                 profile->nrp_config.profile.umount_modules);
     }
 
@@ -275,13 +275,13 @@ out:
         // TODO: Do we really need this?
         memcpy(&default_root_profile, &profile->rp_config.profile, sizeof(default_root_profile));
 #endif
-    } else if (profile->current_uid <= BITMAP_UID_MAX) {
+    } else if (profile->curr_uid <= BITMAP_UID_MAX) {
         if (profile->allow_su)
-            allow_list_bitmap[profile->current_uid / BITS_PER_BYTE] |=
-                1 << (profile->current_uid % BITS_PER_BYTE);
+            allow_list_bitmap[profile->curr_uid / BITS_PER_BYTE] |=
+                1 << (profile->curr_uid % BITS_PER_BYTE);
         else
-            allow_list_bitmap[profile->current_uid / BITS_PER_BYTE] &=
-                ~(1 << (profile->current_uid % BITS_PER_BYTE));
+            allow_list_bitmap[profile->curr_uid / BITS_PER_BYTE] &=
+                ~(1 << (profile->curr_uid % BITS_PER_BYTE));
     } else {
         if (profile->allow_su) {
             /*
@@ -292,10 +292,10 @@ out:
                 pr_err("too many apps registered\n");
                 WARN_ON(1);
             } else {
-                allow_list_arr[allow_list_pointer++] = profile->current_uid;
+                allow_list_arr[allow_list_pointer++] = profile->curr_uid;
             }
         } else {
-            remove_uid_from_arr(profile->current_uid);
+            remove_uid_from_arr(profile->curr_uid);
         }
     }
 
@@ -372,7 +372,7 @@ bool __ksu_is_allow_uid_for_current(uid_t uid)
 bool ksu_uid_should_umount(uid_t uid)
 {
 #ifndef CONFIG_KSU_DISABLE_POLICY
-    struct app_profile profile = { .current_uid = uid };
+    struct app_profile profile = { .curr_uid = uid };
 #endif
     if (unlikely(is_uid_manager(uid))) {
         // we should not umount on manager!
@@ -422,7 +422,7 @@ void ksu_get_root_profile(uid_t uid, struct root_profile *profile)
 
     rcu_read_lock();
     list_for_each_entry_rcu (p, &allow_list, list) {
-        if (uid == p->profile.current_uid && p->profile.allow_su) {
+        if (uid == p->profile.curr_uid && p->profile.allow_su) {
             if (!p->profile.rp_config.use_default) {
                 memcpy(profile, &p->profile.rp_config.profile,
                        sizeof(*profile));
@@ -448,9 +448,9 @@ bool ksu_get_allow_list(int *array, u16 length, u16 *out_length, u16 *out_total,
     list_for_each_entry_rcu (p, &allow_list, list) {
         // pr_info("get_allow_list uid: %d allow: %d\n", p->uid, p->allow);
         if (p->profile.allow_su == allow &&
-            !is_uid_manager(p->profile.current_uid)) {
+            !is_uid_manager(p->profile.curr_uid)) {
             if (j < length) {
-                array[j++] = p->profile.current_uid;
+                array[j++] = p->profile.curr_uid;
             }
             ++i;
         }
@@ -497,7 +497,7 @@ static void do_persistent_allow_list(struct work_struct *work)
     mutex_lock(&allowlist_mutex);
     list_for_each_entry (p, &allow_list, list) {
         pr_info("save allow list, name: %s uid :%d, allow: %d\n",
-                p->profile.key, p->profile.current_uid, p->profile.allow_su);
+                p->profile.key, p->profile.curr_uid, p->profile.allow_su);
 
         ksu_kernel_write_compat(fp, &p->profile, sizeof(p->profile), &off);
     }
@@ -576,7 +576,7 @@ void ksu_load_allow_list()
         migrate_profile(version, &profile);
 
         pr_info("load_allow_uid, name: %s, uid: %d, allow: %d\n", profile.key,
-                profile.current_uid, profile.allow_su);
+                profile.curr_uid, profile.allow_su);
         ksu_set_app_profile(&profile);
     }
 
@@ -605,7 +605,7 @@ void ksu_prune_allowlist(bool (*is_uid_valid)(uid_t, char *, void *),
     bool modified = false;
     mutex_lock(&allowlist_mutex);
     list_for_each_entry_safe (np, n, &allow_list, list) {
-        uid_t uid = np->profile.current_uid;
+        uid_t uid = np->profile.curr_uid;
         char *package = np->profile.key;
         // we use this uid for special cases, don't prune it!
         bool is_preserved_uid = uid == KSU_APP_PROFILE_PRESERVE_UID;
