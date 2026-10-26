@@ -639,7 +639,7 @@ static int do_nuke_ext4_sysfs(void __user *arg)
 
     memset(mnt, 0, sizeof(mnt));
 
-    ret = strncpy_from_user(mnt, cmd.arg, sizeof(mnt));
+	ret = strncpy_from_user(mnt, (const char __user *)(uintptr_t)cmd.arg, sizeof(mnt));
     if (ret < 0) {
         pr_err("nuke ext4 copy mnt failed: %ld\\n", ret);
         return -EFAULT;   // 或者 return ret;
