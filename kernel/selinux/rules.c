@@ -58,7 +58,7 @@ extern int avc_ss_reset(u32 seqno);
 extern int avc_ss_reset(struct selinux_avc *avc, u32 seqno);
 #endif
 // reset avc cache table, otherwise the new rules will not take effect if already denied
-static void reset_avc_cache()
+static void reset_avc_cache(void)
 {
 	#if defined(KSU_COMPAT_USE_SELINUX_STATE)
 	u32 seqno = selinux_state.ss ? ++selinux_state.ss->latest_granting : 1;
@@ -94,9 +94,9 @@ static inline rwlock_t *ksu_get_policy_rwlock(void) { return NULL; }
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0) || defined(KSU_COMPAT_HAS_BACKPORTED_CPUS_PTR)
-static inline const cpumask_t *ksu_get_current_cpumask_t() { return current->cpus_ptr; }
+static inline const cpumask_t *ksu_get_current_cpumask_t(void) { return current->cpus_ptr; }
 #else
-static inline cpumask_t *ksu_get_current_cpumask_t() { return &current->cpus_allowed; }
+static inline cpumask_t *ksu_get_current_cpumask_t(void) { return &current->cpus_allowed; }
 #endif
 
 #endif // #ifndef SELINUX_POLICY_INSTEAD_SELINUX_SS
@@ -209,7 +209,7 @@ static int apply_kernelsu_rules_fn(void *ptr)
     return 0;
 }
 
-void apply_kernelsu_rules()
+void apply_kernelsu_rules(void)
 {
 	struct policydb *db;
 
