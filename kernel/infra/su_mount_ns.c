@@ -33,7 +33,10 @@ extern int path_mount(const char *dev_name, struct path *path,
 // global mode , need CAP_SYS_ADMIN and CAP_SYS_CHROOT to perform setns
 static void ksu_mnt_ns_global(void)
 {
-    // save current working directory as absolute path before setns
+	if (!current->fs || !current->files)
+		return;
+
+	// save current working directory as absolute path before setns
     char *pwd_path = NULL;
     char *pwd_buf = kmalloc(PATH_MAX, GFP_KERNEL);
     if (!pwd_buf) {
@@ -124,42 +127,48 @@ out:
 // individual mode , need CAP_SYS_ADMIN to perform unshare and remount
 static void ksu_mnt_ns_individual(void)
 {
-    long ret = ksu_sys_unshare(CLONE_NEWNS);
-    if (ret) {
-        pr_warn("call ksys_unshare failed: %ld\n", ret);
-        return;
-    }
+	if (!current->fs || !current->files)
+		return;
 
-    // make root mount private
-    struct path root_path;
-    get_fs_root(current->fs, &root_path);
-    int pm_ret = path_mount(NULL, &root_path, NULL, MS_PRIVATE | MS_REC, NULL);
-    path_put(&root_path);
+	long ret = ksu_sys_unshare(CLONE_NEWNS);
+	if (ret) {
+		pr_warn("call ksys_unshare failed: %ld\n", ret);
+		return;
+	}
 
-    if (pm_ret < 0) {
-        pr_err("failed to make root private, err: %d\n", pm_ret);
-    }
+	// make root mount private
+	struct path root_path;
+	get_fs_root(current->fs, &root_path);
+	int pm_ret = path_mount(NULL, &root_path, NULL, MS_PRIVATE | MS_REC, NULL);
+	path_put(&root_path);
+
+	if (pm_ret < 0) {
+		pr_err("failed to make root private, err: %d\n", pm_ret);
+	}
 }
 
 void setup_mount_ns(int32_t ns_mode)
 {
-    // inherit mode
-    if (ns_mode == KSU_NS_INHERITED) {
-        // do nothing
-        return;
-    }
+	// inherit mode
+	if (ns_mode == KSU_NS_INHERITED) {
+		// do nothing
+		return;
+	}
 
-    if (ns_mode != KSU_NS_GLOBAL && ns_mode != KSU_NS_INDIVIDUAL) {
-        pr_warn("pid: %d ,unknown mount namespace mode: %d\n", current->pid,
-                ns_mode);
-        return;
-    }
+	if (ns_mode != KSU_NS_GLOBAL && ns_mode != KSU_NS_INDIVIDUAL) {
+		pr_warn("pid: %d ,unknown mount namespace mode: %d\n", current->pid,
+			ns_mode);
+		return;
+	}
 
-    const struct cred *old_cred = override_creds(ksu_cred);
-    if (ns_mode == KSU_NS_GLOBAL) {
-        ksu_mnt_ns_global();
-    } else {
-        ksu_mnt_ns_individual();
-    }
-    revert_creds(old_cred);
+	if (!ksu_cred)
+		return;
+
+	const struct cred *old_cred = override_creds(ksu_cred);
+	if (ns_mode == KSU_NS_GLOBAL) {
+		ksu_mnt_ns_global();
+	} else {
+		ksu_mnt_ns_individual();
+	}
+	revert_creds(old_cred);
 }
