@@ -42,7 +42,7 @@ static const struct file_operations ksu_sulog_fops = {
 	.read = ksu_sulog_read,
 	.poll = ksu_sulog_poll,
 	.release = ksu_sulog_release,
-	.llseek = noop_llseek,
+	.llseek = no_llseek,
 };
 
 int ksu_install_sulog_fd(void)
