@@ -6,8 +6,6 @@
 #include "uapi/feature.h"
 #include "klog.h"
 #include "ksu.h"
-#include "runtime/ksud.h"
-#include "infra/seccomp_cache.h"
 
 // sorry for the ifdef hell
 // but im too lazy to fragment this out.
@@ -20,8 +18,8 @@ static u32 priv_app_sid = 0;
 // init as disabled by default
 static atomic_t disable_spoof = ATOMIC_INIT(1);
 
-void ksu_avc_spoof_enable();
-void ksu_avc_spoof_disable();
+void ksu_avc_spoof_enable(void);
+void ksu_avc_spoof_disable(void);
 
 static bool ksu_avc_spoof_enabled = true;
 static bool boot_completed = false;
@@ -63,7 +61,7 @@ static const struct ksu_feature_handler avc_spoof_handler = {
 	.set_handler = avc_spoof_feature_set,
 };
 
-static int get_sid()
+static int get_sid(void)
 {
 	// dont load at all if we cant get sids
 	int err = ksu_security_secctx_to_secid("u:r:su:s0", strlen("u:r:su:s0"), &su_sid);
@@ -141,7 +139,7 @@ static struct kprobe *init_kprobe(const char *name,
 	kp->pre_handler = handler;
 
 	int ret = register_kprobe(kp);
-	pr_info("sucompat: register_%s kprobe: %d\n", name, ret);
+	pr_info("avc_spoof: register_%s kprobe: %d\n", name, ret);
 	if (ret) {
 		kfree(kp);
 		return NULL;
@@ -182,6 +180,10 @@ void ksu_avc_spoof_enable(void)
 #ifdef KSU_KPROBES_HOOK
 	pr_info("avc_spoof/init: register slow_avc_audit kprobe!\n");
 	slow_avc_audit_kp = init_kprobe("slow_avc_audit", slow_avc_audit_pre_handler);
+	if (!slow_avc_audit_kp) {
+		pr_err("avc_spoof/init: register slow_avc_audit kprobe failed!\n");
+		return;
+	}
 #endif	
 	// once we get the sids, we can now enable the hook handler
 	atomic_set(&disable_spoof, 0);
