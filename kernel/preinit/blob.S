@@ -7,6 +7,8 @@
 	.balign 16
 	.global ksu_preinit_runner_start
 ksu_preinit_runner_start:
+#ifdef KSU_PREINIT_RUNNER_BIN
 	.incbin KSU_PREINIT_RUNNER_BIN
+#endif
 	.global ksu_preinit_runner_end
 ksu_preinit_runner_end:
