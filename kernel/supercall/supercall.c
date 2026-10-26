@@ -296,7 +296,7 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
 			kfree(tw);
 			pr_warn("install fd add task_work failed\n");
 		}
-		return 0;
+		return KSU_SUPERCALL_HANDLED;
 	}
 
 	// extensions 
@@ -315,7 +315,7 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
 				pr_info("sys_reboot: reply fail\n");
 		}
 
-		return 0;
+		return KSU_SUPERCALL_HANDLED;
 	}
 	
 	if (magic2 == GET_SULOG_DUMP_V2) {
@@ -329,6 +329,8 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
 
 		if (copy_to_user((void __user *)*arg, &reply, sizeof(reply) ))
 			return 0;
+
+		return KSU_SUPERCALL_HANDLED;
 	}
 
 	if (magic2 == CHANGE_KSUVER) {
@@ -341,6 +343,8 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
 
 		if (copy_to_user((void __user *)*arg, &reply, sizeof(reply) ))
 			return 0;
+
+		return KSU_SUPERCALL_HANDLED;
 	}
 
 	// WARNING!!! triple ptr zone! ***
@@ -425,6 +429,8 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
 		// we write our confirmation on **
 		if (copy_to_user((void __user *)*arg, &reply, sizeof(reply)))
 			return 0;
+
+		return KSU_SUPERCALL_HANDLED;
 	}
 
 	return 0;
