@@ -55,8 +55,7 @@ void ksu_compat_sulog(uint8_t sym)
 
 	ktime_get_boottime_ts64(&ts);
 	entry.s_time = (uint32_t)ts.tv_sec;
-	entry.data = (uint32_t)uid;
-	memcpy((void *)&entry.data + 3, &sym, 1);
+	entry.data = (uid & 0x00FFFFFFU) | ((uint32_t)sym << 24);
 
 	spin_lock(&compat_sulog_lock);
 	compat_sulog_buf[compat_sulog_idx] = entry;
