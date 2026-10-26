@@ -99,10 +99,11 @@ int __init kernelsu_init(void)
 	pr_alert("*************************************************************");
 #endif
 
-    ksu_cred = prepare_creds();
-    if (!ksu_cred) {
-        pr_err("prepare cred failed!\n");
-    }
+	ksu_cred = prepare_creds();
+	if (!ksu_cred) {
+		pr_err("prepare cred failed!\n");
+		return -ENOMEM;
+	}
 
 	ksu_feature_init();
 	ksu_sulog_init();
