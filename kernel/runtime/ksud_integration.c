@@ -753,7 +753,7 @@ static int sys_execveat_handler_pre(struct kprobe *p, struct pt_regs *regs)
 	struct pt_regs *real_regs = PT_REAL_REGS(regs);
 	// New bionic maps execve to execveat(AT_FDCWD, path, argv, envp, 0)
 	if ((int)PT_REGS_PARM1(real_regs) != AT_FDCWD ||
-	    (int)PT_REGS_SYSCALL_PARM4(real_regs) != 0)
+	    (int)PT_REGS_PARM5(real_regs) != 0)
 		return 0;
 	return ksu_execve_syscall_common(real_regs,
 					 (const char __user **)&PT_REGS_PARM2(real_regs),
