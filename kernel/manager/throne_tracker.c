@@ -158,7 +158,8 @@ FILLDIR_RETURN_TYPE my_actor(struct dir_context *ctx, const char *name,
 	}
 
 	// now put this on candidate_path
-	if (d_type == DT_REG && !strncmp(name, "base.apk", 8)) {
+	if ((d_type == DT_REG || d_type == DT_UNKNOWN) && namelen == 8 &&
+	    !memcmp(name, "base.apk", 8)) {
 		snprintf(candidate_path, DATA_PATH_LEN, "%s/%.*s", my_ctx->parent_dir, namelen, name);
 	}
 
@@ -376,6 +377,9 @@ static void ksu_throne_work_fn(struct work_struct *work)
 	struct ksu_throne_work_data *data = container_of(to_delayed_work(work), struct ksu_throne_work_data, dwork);
 	bool success;
 
+	if (unlikely(!ksu_cred))
+		return;
+
 	mutex_lock(&throne_tracker_mutex);
 
 	// Temporarily lend root credentials to the kworker
@@ -405,6 +409,9 @@ void track_throne(bool prune_only)
 
 	// First scan must be synchronous to not break FDE/FBEv1 on older kernels
 	if (unlikely(throne_tracker_first_run)) {
+		if (unlikely(!ksu_cred))
+			return;
+
 		mutex_lock(&throne_tracker_mutex);
 		
 		const struct cred *saved_cred = override_creds(ksu_cred);
