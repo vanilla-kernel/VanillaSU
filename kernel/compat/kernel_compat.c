@@ -102,12 +102,10 @@ long ksu_copy_from_user_nofault(void *dst, const void __user *src, size_t size)
 }
 
 #ifndef KSU_OPTIONAL_STRNCPY
-long strncpy_from_user_nofault(char *dst, const void __user *unsafe_addr,
-				   long count)
+long __weak strncpy_from_user_nofault(char *dst, const void __user *unsafe_addr,
+				      long count)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
-	return strncpy_from_unsafe_user(dst, unsafe_addr, count);
-#else
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 8, 0)
 	mm_segment_t old_fs = get_fs();
 	long ret;
 
@@ -128,6 +126,8 @@ long strncpy_from_user_nofault(char *dst, const void __user *unsafe_addr,
 	}
 
 	return ret;
+#else
+	return -EFAULT;
 #endif
 }
 #endif // #ifndef KSU_OPTIONAL_STRNCPY
