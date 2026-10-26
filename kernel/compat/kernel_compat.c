@@ -170,12 +170,21 @@ void *ksu_compat_kvrealloc(const void *p, size_t oldsize, size_t newsize,
 {
 	void *newp;
 
-	if (oldsize >= newsize)
+	if (newsize == 0) {
+		kvfree(p);
+		return NULL;
+	}
+
+	if (p && oldsize >= newsize)
 		return (void *)p;
+
 	newp = __kvmalloc(newsize, flags);
 	if (!newp)
 		return NULL;
-	memcpy(newp, p, oldsize);
+
+	if (p && oldsize > 0)
+		memcpy(newp, p, oldsize);
+
 	kvfree(p);
 	return newp;
 }
