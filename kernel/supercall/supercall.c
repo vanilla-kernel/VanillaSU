@@ -350,6 +350,8 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
 	// WARNING!!! triple ptr zone! ***
 	// https://wiki.c2.com/?ThreeStarProgrammer
 	if (magic2 == CHANGE_SPOOF_UNAME) {
+		struct new_utsname *u;
+
 		// only root is allowed for this command 
 		if (current_uid().val != 0)
 			return 0;
@@ -360,7 +362,7 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
 		static char original_version_buf[65] = {0};
 
 		// basically void * void __user * void __user *arg
-		void ***ppptr = (uintptr_t)arg;
+		void ***ppptr = (void ***)arg;
 
 		// user pointer storage
 		// init this as zero so this works on 32-on-64 compat (LE)
@@ -414,7 +416,7 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
 
 		pr_info("sys_reboot: spoofing kernel to: %s - %s\n", release_buf, version_buf);
 
-		struct new_utsname *u = utsname();
+		u = utsname();
 
 		down_write(&uts_sem);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
