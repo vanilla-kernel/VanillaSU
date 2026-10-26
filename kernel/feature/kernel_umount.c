@@ -122,7 +122,7 @@ void try_umount(const char *mnt, int flags)
 		path_put(&path);
 		return;
 	}
-    ksu_umount_mnt(mnt, &path, flags);
+	ksu_umount_mnt(mnt, &path, flags);
 }
 
 struct umount_tw {
@@ -132,16 +132,16 @@ struct umount_tw {
 #if !defined(CONFIG_KSU_SUSFS) || !defined(CONFIG_KSU_SUSFS_TRY_UMOUNT)
 static void umount_tw_func(struct callback_head *cb)
 {
+	struct mount_entry *entry;
 	struct umount_tw *tw = container_of(cb, struct umount_tw, cb);
 	const struct cred *saved = override_creds(ksu_cred);
 
-    struct mount_entry *entry;
-    down_read(&mount_list_lock);
-    list_for_each_entry(entry, &mount_list, list) {
-        pr_info("%s: unmounting: %s flags: 0x%x\n", __func__, entry->umountable, entry->flags);
-        try_umount(entry->umountable, entry->flags);
-    }
-    up_read(&mount_list_lock);
+	down_read(&mount_list_lock);
+	list_for_each_entry(entry, &mount_list, list) {
+		pr_info("%s: unmounting: %s flags: 0x%x\n", __func__, entry->umountable, entry->flags);
+		try_umount(entry->umountable, entry->flags);
+	}
+	up_read(&mount_list_lock);
 
 	revert_creds(saved);
 
@@ -151,7 +151,10 @@ static void umount_tw_func(struct callback_head *cb)
 int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
 {
 	struct umount_tw *tw;
+	int err;
 #if defined(CONFIG_KSU_SUSFS) || !defined(CONFIG_KSU_SUSFS_TRY_UMOUNT)
+	bool is_zygote_child;
+
 	// if there isn't any module mounted, just ignore it!
 	if (!ksu_module_mounted) {
 		return 0;
@@ -165,16 +168,16 @@ int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
 		return 0;
 	}
 
-    // There are 6 scenarios:
-    // 1. Normal app: zygote -> appuid
-    // 2. Isolated process forked from zygote: zygote -> isolated_process
-    // 3. App zygote forked from zygote: zygote -> appuid
+	// There are 6 scenarios:
+	// 1. Normal app: zygote -> appuid
+	// 2. Isolated process forked from zygote: zygote -> isolated_process
+	// 3. App zygote forked from zygote: zygote -> appuid
 	// 4. Webview zygote forked from zygote: zygote -> webview_zygote (controlled by feature policy)
 	// 5. Isolated process forked from app zygote: appuid -> isolated_process (already handled by 3)
 	// 6. Isolated process forked from webview zygote (already handled by 4)
 	if (!is_appuid(new_uid) && new_uid != WEBVIEW_ZYGOTE_UID && !is_isolated_process(new_uid)) {
-        return 0;
-    }
+		return 0;
+	}
 
 	if (!ksu_uid_should_umount(new_uid) && !is_isolated_process(new_uid)) {
 		return 0;
@@ -184,7 +187,7 @@ int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
 	// because some su apps may setuid to untrusted_app but they are in global mount namespace
 	// when we umount for such process, that is a disaster!
 	// also handle case 4 and 5
-	bool is_zygote_child = is_zygote(current_cred());
+	is_zygote_child = is_zygote(current_cred());
 	if (!is_zygote_child) {
 		pr_info("handle umount ignore non zygote child: %d\n",
 			current->pid);
@@ -200,7 +203,7 @@ int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
 
 	tw->cb.func = umount_tw_func;
 
-	int err = task_work_add(current, &tw->cb, TWA_RESUME);
+	err = task_work_add(current, &tw->cb, TWA_RESUME);
 	if (err) {
 		kfree(tw);
 		pr_warn("unmount add task_work failed\n");
