@@ -463,8 +463,6 @@ static struct kprobe reboot_kp = {
 
 void __init ksu_supercalls_init(void)
 {
-	int i;
-
 	ksu_supercall_dump_commands();
 
 #ifdef KSU_KPROBES_HOOK
@@ -478,9 +476,8 @@ void __init ksu_supercalls_init(void)
 
 }
 
-void __exit ksu_supercalls_exit(void){
-	struct mount_entry *entry, *tmp;
-
+void __exit ksu_supercalls_exit(void)
+{
 #ifdef KSU_KPROBES_HOOK
 	unregister_kprobe(&reboot_kp);
 #endif
