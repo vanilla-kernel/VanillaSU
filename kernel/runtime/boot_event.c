@@ -12,6 +12,8 @@
 #include "runtime/ksud.h"
 #include "manager/manager_observer.h"
 #include "manager/throne_tracker.h"
+#include "selinux/selinux.h"
+#include "hook/hook_manager.h"
 
 bool ksu_module_mounted __read_mostly = false;
 bool ksu_boot_completed __read_mostly = false;
@@ -64,6 +66,14 @@ void on_post_fs_data(void)
 	done = true;
 	pr_info("on_post_fs_data!\n");
 
+	cache_sid();
+#ifdef CONFIG_KSU_SUSFS
+	susfs_set_priv_app_sid();
+	susfs_set_init_sid();
+	susfs_set_ksu_sid();
+	susfs_set_zygote_sid();
+#endif
+
 	ksu_load_allow_list();
 	ksu_observer_init();
 	/* After the observer is up, so a ksud install can't slip in between. */
@@ -72,6 +82,9 @@ void on_post_fs_data(void)
 	// sanity check, this may influence the performance
 	ksu_stop_input_hook_runtime();
 	ksu_selinux_hide_handle_post_fs_data();
+#ifdef KSU_KPROBES_HOOK
+	ksu_mark_running_process();
+#endif
 }
 
 extern void ext4_unregister_sysfs(struct super_block *sb);

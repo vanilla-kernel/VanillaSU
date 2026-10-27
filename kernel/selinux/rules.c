@@ -786,6 +786,13 @@ out_done:
 	 * a stale AVC cache would keep serving the pre-batch decisions.
 	 */
 	reset_avc_cache();
+	cache_sid();
+#ifdef CONFIG_KSU_SUSFS
+	susfs_set_priv_app_sid();
+	susfs_set_init_sid();
+	susfs_set_ksu_sid();
+	susfs_set_zygote_sid();
+#endif
 
 	if (ret)
 		goto out_free;
