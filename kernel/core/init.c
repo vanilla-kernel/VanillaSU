@@ -25,6 +25,7 @@
 #include <linux/susfs.h>
 #endif // #ifdef CONFIG_KSU_SUSFS
 #include "selinux/selinux.h"
+#include "feature/shell_su_adb_only.h"
 
 extern void __init ksu_lsm_hook_init(void);
 extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
@@ -109,6 +110,8 @@ int __init kernelsu_init(void)
 	ksu_feature_init();
 	ksu_sulog_init();
 	ksu_adb_root_init();
+	ksu_shell_su_adb_only_init();
+	ksu_feature_apply_forced();
 
 	ksu_supercalls_init();
 
@@ -190,6 +193,7 @@ void __exit kernelsu_exit(void)
 	ksu_allowlist_exit();
 
 	ksu_adb_root_exit();
+	ksu_shell_su_adb_only_exit();
 
 	ksu_sulog_exit();
 
