@@ -11,8 +11,6 @@
 #include "setuid_hook.h"
 #include "manager/throne_tracker.h"
 
-#ifndef KSU_KPROBES_HOOK
-
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) ||                           \
 	defined(CONFIG_IS_HW_HISI) || defined(CONFIG_KSU_ALLOWLIST_WORKAROUND)
 struct key *init_session_keyring = NULL;
@@ -154,9 +152,3 @@ void __init ksu_lsm_hook_init(void)
 #endif
 	pr_info("LSM hooks initialized.\n");
 }
-#else
-void __init ksu_lsm_hook_init(void)
-{
-	return;
-}
-#endif

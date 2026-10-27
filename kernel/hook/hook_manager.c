@@ -381,16 +381,6 @@ static void ksu_sys_enter_handler(void *data, struct pt_regs *regs, long id)
 
 		}
 
-		// Handle setresuid
-#ifdef CONFIG_COMPAT
-		if (id == __NR_setresuid || id == __NR_setresuid32) {
-#else
-		if (id == __NR_setresuid) {
-#endif
-			uid_t ruid = (uid_t)PT_REGS_PARM1(regs);
-			ksu_handle_setresuid(current_uid().val, ruid);
-			return;
-		}
 	}
 }
 #endif
