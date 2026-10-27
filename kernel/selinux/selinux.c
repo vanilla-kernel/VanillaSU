@@ -171,6 +171,9 @@ void cache_sid(void)
         cached_su_sid = 0;
     } else {
         pr_info("Cached su SID: %u\n", cached_su_sid);
+#ifdef CONFIG_KSU_SUSFS
+		susfs_ksu_sid = cached_su_sid;
+#endif
     }
 
 	err = security_secctx_to_secid(ZYGOTE_CONTEXT, strlen(ZYGOTE_CONTEXT),
@@ -201,6 +204,9 @@ void cache_sid(void)
         cached_init_sid = 0;
     } else {
         pr_info("Cached init SID: %u\n", cached_init_sid);
+#ifdef CONFIG_KSU_SUSFS
+		susfs_init_sid = cached_init_sid;
+#endif
     }
 
     err = security_secctx_to_secid(KSU_FILE_CONTEXT, strlen(KSU_FILE_CONTEXT),
@@ -232,16 +238,20 @@ static bool is_sid_match(const struct cred *cred, u32 cached_sid,
 		return false;
 	}
 
-	if (likely(cached_sid != 0) && tsec->sid == cached_sid) {
+	if (likely(cached_sid > 1) && tsec->sid == cached_sid) {
 		return true;
 	}
 
 	struct lsm_context ctx;
-	bool result;
+	bool result = false;
 	if (__security_secid_to_secctx(tsec->sid, &ctx)) {
 		return false;
 	}
-	result = strncmp(fallback_context, ctx.context, ctx.len) == 0;
+	if (ctx.context) {
+		size_t len = strlen(fallback_context);
+		result = (strncmp(fallback_context, ctx.context, len) == 0) &&
+			 (ctx.context[len] == '\0' || ctx.context[len] == ':');
+	}
 	__security_release_secctx(&ctx);
 	return result;
 }

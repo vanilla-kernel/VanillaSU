@@ -103,12 +103,11 @@ int ksu_handle_setresuid(uid_t old_uid, uid_t new_uid)
 
     // We only interest in process spwaned by zygote
 #ifdef CONFIG_KSU_SUSFS
-	if (!susfs_is_sid_equal(current_cred(), susfs_zygote_sid)) {
-		if (is_zygote(current_cred())) {
-			susfs_zygote_sid = current_sid();
-		} else {
-			return 0;
-		}
+	if (susfs_zygote_sid > 1 && susfs_is_sid_equal(current_cred(), susfs_zygote_sid)) {
+	} else if (is_zygote(current_cred())) {
+		susfs_zygote_sid = current_sid();
+	} else {
+		return 0;
 	}
 #else
 	if (!is_zygote(current_cred())) {
