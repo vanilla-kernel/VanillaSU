@@ -458,7 +458,7 @@ static const struct ksu_manager_profile ksu_manager_profiles[] = {
 		.cert_size = 0x3e6,
 		.cert_sha256 = "79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7",
 		.spoof_version = 0,
-		.spoof_uapi_version = 0,
+		.spoof_uapi_version = 2,
 		.spoof_version_tag = NULL,
 		.spoof_features = 0,
 	},
