@@ -90,7 +90,8 @@ static void ksu_mark_running_process_locked()
 		const struct cred *cred = get_task_cred(t);
 		bool ksu_root_process =
 			uid == 0 && is_task_ksu_domain(cred);
-		bool is_zygote_process = is_zygote(cred);
+		bool is_zygote_process = is_zygote(cred) ||
+			(t->pid > 1 && uid == 0 && (!strcmp(t->comm, "main") || !strcmp(t->comm, "zygote") || !strcmp(t->comm, "zygote64")));
 		bool is_shell = uid == 2000;
 		// before boot completed, we shall mark init for marking zygote
 		bool is_init = t->pid == 1;
