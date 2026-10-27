@@ -1,4 +1,6 @@
 #include <linux/lsm_hooks.h>
+#include <linux/cred.h>
+#include <linux/sched.h>
 #include <linux/uidgid.h>
 #include <linux/version.h>
 #include <linux/binfmts.h>
