@@ -20,7 +20,6 @@
 #include "setuid_hook.h"
 #include "klog.h" // IWYU pragma: keep
 #include "manager/manager_identity.h"
-#include "selinux/selinux.h"
 #include "infra/seccomp_cache.h"
 #include "supercall/supercall.h"
 #include "hook_manager.h"
@@ -45,7 +44,6 @@ static inline bool is_zygote_isolated_service_uid(uid_t uid)
 	return (uid >= 99000 && uid < 100000);
 }
 
-extern u32 susfs_zygote_sid;
 extern struct cred *ksu_cred;
 
 #ifdef CONFIG_KSU_SUSFS_SUS_PATH
@@ -100,20 +98,6 @@ static void ksu_install_manager_fd_tw_func(struct callback_head *cb)
 int ksu_handle_setresuid(uid_t old_uid, uid_t new_uid)
 {
     // we rely on the fact that zygote always call setresuid(3) with same uids
-
-    // We only interest in process spwaned by zygote
-#ifdef CONFIG_KSU_SUSFS
-	if (susfs_zygote_sid > 1 && susfs_is_sid_equal(current_cred(), susfs_zygote_sid)) {
-	} else if (is_zygote(current_cred())) {
-		susfs_zygote_sid = current_sid();
-	} else {
-		return 0;
-	}
-#else
-	if (!is_zygote(current_cred())) {
-		return 0;
-	}
-#endif
 
 #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
     // Check if spawned process is isolated service first, and force to do umount if so  
