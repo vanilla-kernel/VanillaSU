@@ -72,51 +72,55 @@ static int ksu_sha256(const unsigned char *data, unsigned int datalen,
 	return ret;
 }
 
-static bool check_block(struct file *fp, u32 *size4, loff_t *pos, u32 *offset,
+static bool read_exact(struct file *fp, void *buffer, size_t size, loff_t *pos,
+			loff_t end)
+{
+	if (*pos < 0 || *pos > end || size > (size_t)(end - *pos))
+		return false;
+	return ksu_kernel_read_compat(fp, buffer, size, pos) == (ssize_t)size;
+}
+
+static bool read_length_prefixed_end(struct file *fp, loff_t *pos,
+			loff_t container_end, loff_t *value_end)
+{
+	u32 length;
+
+	if (!read_exact(fp, &length, sizeof(length), pos, container_end))
+		return false;
+	if (length > INT_MAX || length > (u64)(container_end - *pos))
+		return false;
+	*value_end = *pos + length;
+	return true;
+}
+
+static bool check_block(struct file *fp, loff_t *pos, loff_t block_end,
 			unsigned expected_size, const char *expected_sha256)
 {
-	ksu_kernel_read_compat(fp, size4, 0x4, pos); // signer-sequence length
-	ksu_kernel_read_compat(fp, size4, 0x4, pos); // signer length
-	ksu_kernel_read_compat(fp, size4, 0x4, pos); // signed data length
+	loff_t signers_end, signer_end, signed_data_end, digests_end, certificates_end;
+	u32 certificate_size;
+	char cert[1024];
+	unsigned char digest[SHA256_DIGEST_SIZE];
+	char hash_str[SHA256_DIGEST_SIZE * 2 + 1];
 
-	*offset += 0x4 * 3;
-
-	ksu_kernel_read_compat(fp, size4, 0x4, pos); // digests-sequence length
-
-	*pos += *size4;
-	*offset += 0x4 + *size4;
-
-	ksu_kernel_read_compat(fp, size4, 0x4, pos); // certificates length
-	ksu_kernel_read_compat(fp, size4, 0x4, pos); // certificate length
-	*offset += 0x4 * 2;
-
-	if (*size4 == expected_size) {
-		*offset += *size4;
-
-#define CERT_MAX_LENGTH 1024
-		char cert[CERT_MAX_LENGTH];
-		if (*size4 > CERT_MAX_LENGTH) {
-			pr_info("cert length overlimit\n");
-			return false;
-		}
-		ksu_kernel_read_compat(fp, cert, *size4, pos);
-		unsigned char digest[SHA256_DIGEST_SIZE];
-		if (ksu_sha256(cert, *size4, digest) < 0 ) {
-			pr_info("sha256 error\n");
-			return false;
-		}
-
-		char hash_str[SHA256_DIGEST_SIZE * 2 + 1];
-		hash_str[SHA256_DIGEST_SIZE * 2] = '\0';
-
-		bin2hex(hash_str, digest, SHA256_DIGEST_SIZE);
-		pr_info("sha256: %s, expected: %s\n", hash_str,
-			expected_sha256);
-		if (strcmp(expected_sha256, hash_str) == 0) {
-			return true;
-		}
-	}
-	return false;
+	if (!read_length_prefixed_end(fp, pos, block_end, &signers_end) ||
+	    !read_length_prefixed_end(fp, pos, signers_end, &signer_end) ||
+	    !read_length_prefixed_end(fp, pos, signer_end, &signed_data_end) ||
+	    !read_length_prefixed_end(fp, pos, signed_data_end, &digests_end))
+		return false;
+	*pos = digests_end;
+	if (!read_length_prefixed_end(fp, pos, signed_data_end, &certificates_end) ||
+	    !read_exact(fp, &certificate_size, sizeof(certificate_size), pos, certificates_end))
+		return false;
+	if (certificate_size > INT_MAX || certificate_size > (u64)(certificates_end - *pos) ||
+	    certificate_size != expected_size || certificate_size > sizeof(cert))
+		return false;
+	if (!read_exact(fp, cert, certificate_size, pos, certificates_end))
+		return false;
+	if (ksu_sha256(cert, certificate_size, digest) < 0)
+		return false;
+	bin2hex(hash_str, digest, SHA256_DIGEST_SIZE);
+	hash_str[SHA256_DIGEST_SIZE * 2] = '\0';
+	return strcmp(expected_sha256, hash_str) == 0;
 }
 
 struct zip_entry_header {
@@ -226,18 +230,14 @@ static __always_inline bool check_v2_signature(const char *path,
 						unsigned expected_size,
 						const char *expected_sha256)
 {
-	unsigned char buffer[0x11] = { 0 };
-	u32 size4;
-	u64 size8, size_of_block;
+	unsigned char buffer[0x10];
+	u32 cd_offset;
+	u64 size_of_block, size_of_block_at_head;
 
-	loff_t pos;
+	loff_t pos, pairs_end, file_size;
 
 	bool v2_signing_valid = false;
 	int v2_signing_blocks = 0;
-	bool v3_signing_exist = false;
-	bool v3_1_signing_exist = false;
-
-	int i;
 	struct file *fp = ksu_filp_open_compat(path, O_RDONLY, 0);
 	if (IS_ERR(fp)) {
 		pr_err("open %s error.\n", path);
@@ -250,13 +250,14 @@ static __always_inline bool check_v2_signature(const char *path,
 	// https://en.wikipedia.org/wiki/Zip_(file_format)#End_of_central_directory_record_(EOCD)
 	{
 		unsigned char *eocd_buffer;
-		loff_t file_size;
 		long search_size;
 		long max_comment_size = 0xffff;
 		long eocd_min_size = 22;
 		long eocd_found = 0;
 
 		file_size = generic_file_llseek(fp, 0, SEEK_END);
+		if (file_size < 0)
+			goto clean;
 		search_size = max_comment_size + eocd_min_size;
 		if (search_size > file_size) {
 			search_size = file_size;
@@ -269,7 +270,10 @@ static __always_inline bool check_v2_signature(const char *path,
 		}
 
 		pos = file_size - search_size;
-		ksu_kernel_read_compat(fp, eocd_buffer, search_size, &pos);
+		if (!read_exact(fp, eocd_buffer, search_size, &pos, file_size)) {
+			kvfree(eocd_buffer);
+			goto clean;
+		}
 
 		if (search_size >= eocd_min_size) {
 			long j;
@@ -297,51 +301,42 @@ static __always_inline bool check_v2_signature(const char *path,
 		}
 	}
 
-	pos += 16; // skip 4 bytes signature + 12 bytes
-	// offset
-	ksu_kernel_read_compat(fp, &size4, 0x4, &pos);
-	pos = size4 - 0x18;
-
-	ksu_kernel_read_compat(fp, &size8, 0x8, &pos);
-	ksu_kernel_read_compat(fp, buffer, 0x10, &pos);
-	if (strcmp((char *)buffer, "APK Sig Block 42")) {
+	pos += 16;
+	if (!read_exact(fp, &cd_offset, sizeof(cd_offset), &pos, file_size) ||
+	    cd_offset < 0x20 || cd_offset > file_size)
 		goto clean;
-	}
-
-	pos = size4 - (size8 + 0x8);
-	ksu_kernel_read_compat(fp, &size_of_block, 0x8, &pos);
-	if (size_of_block != size8) {
+	pairs_end = (loff_t)cd_offset - 0x18;
+	pos = pairs_end;
+	if (!read_exact(fp, &size_of_block, sizeof(size_of_block), &pos, cd_offset) ||
+	    !read_exact(fp, buffer, sizeof(buffer), &pos, cd_offset) ||
+	    memcmp(buffer, "APK Sig Block 42", sizeof(buffer)))
 		goto clean;
-	}
+	if (size_of_block < 0x18 || size_of_block > INT_MAX - 0x8 ||
+	    size_of_block > (u64)cd_offset - 0x8)
+		goto clean;
+	pos = (loff_t)cd_offset - (loff_t)size_of_block - 0x8;
+	if (!read_exact(fp, &size_of_block_at_head, sizeof(size_of_block_at_head), &pos, pairs_end) ||
+	    size_of_block_at_head != size_of_block)
+		goto clean;
+	while (pos < pairs_end) {
+		u32 id;
+		u64 size_of_pair;
+		loff_t pair_end;
 
-	int loop_count = 0;
-	while (loop_count++ < 10) {
-		uint32_t id;
-		uint32_t offset;
-		ksu_kernel_read_compat(fp, &size8, 0x8,
-					&pos); // sequence length
-		if (size8 == size_of_block) {
-			break;
-		}
-		ksu_kernel_read_compat(fp, &id, 0x4, &pos); // id
-		offset = 4;
+		if (!read_exact(fp, &size_of_pair, sizeof(size_of_pair), &pos, pairs_end) ||
+		    size_of_pair < sizeof(id) || size_of_pair > INT_MAX ||
+		    size_of_pair > (u64)(pairs_end - pos))
+			goto invalid;
+		pair_end = pos + (loff_t)size_of_pair;
+		if (!read_exact(fp, &id, sizeof(id), &pos, pair_end))
+			goto invalid;
 		if (id == 0x7109871au) {
 			v2_signing_blocks++;
-			v2_signing_valid =
-				check_block(fp, &size4, &pos, &offset,
-						expected_size, expected_sha256);
-		} else if (id == 0xf05368c0u) {
-			// http://aospxref.com/android-14.0.0_r2/xref/frameworks/base/core/java/android/util/apk/ApkSignatureSchemeV3Verifier.java#73
-			v3_signing_exist = true;
-		} else if (id == 0x1b93ad61u) {
-			// http://aospxref.com/android-14.0.0_r2/xref/frameworks/base/core/java/android/util/apk/ApkSignatureSchemeV3Verifier.java#74
-			v3_1_signing_exist = true;
-		} else {
-#ifdef CONFIG_KSU_DEBUG
-			pr_info("Unknown id: 0x%08x\n", id);
-#endif
+			v2_signing_valid = check_block(fp, &pos, pair_end, expected_size, expected_sha256);
+		} else if (id != 0x42726577u) {
+			goto invalid;
 		}
-		pos += (size8 - offset);
+		pos = pair_end;
 	}
 
 	if (v2_signing_blocks != 1) {
@@ -356,20 +351,14 @@ static __always_inline bool check_v2_signature(const char *path,
 		int has_v1_signing = has_v1_signature_file(fp);
 		if (has_v1_signing) {
 			pr_err("Unexpected v1 signature scheme found!\n");
-			filp_close(fp, 0);
-			return false;
+			goto invalid;
 		}
 	}
+	goto clean;
+invalid:
+	v2_signing_valid = false;
 clean:
 	filp_close(fp, 0);
-
-	if (v3_signing_exist || v3_1_signing_exist) {
-#ifdef CONFIG_KSU_DEBUG
-		pr_err("Unexpected v3 signature scheme found!\n");
-#endif
-		return false;
-	}
-
 	return v2_signing_valid;
 }
 
